@@ -1,0 +1,16 @@
+# Composable Me Hydra - Python Dependencies
+
+# Core orchestration
+crewai>=0.86.0
+crewai-tools>=0.17.0
+
+# LLM providers
+openai>=1.0.0  # Required by crewai for API compatibility
+litellm>=1.80.0  # Required for OpenRouter and other non-native providers
+langchain>=0.3.0
+langchain-openai>=0.2.0
+
+# Utilities
+pyyaml>=6.0
+python-dotenv>=1.0.0
+rich>=13.0.0  # Better console output
