@@ -1,4 +1,6 @@
-# Implementation Plan
+We can leave the job-discovery feature to one side for now. No need to have it. We can proceed with the Composable crew project now.
+
+One thing I'd like to find out is how are you going to delegate work to your fellow agents outside of this IDE? And how are you going to pick up their work when it's complete? What kind of flag system or file system do you want to use? And where should we do this? # Implementation Plan
 
 This plan is organized to enable parallel development across multiple work streams. Tasks are grouped by dependency, allowing different developers/agents to work simultaneously on independent components.
 
@@ -15,41 +17,41 @@ This plan is organized to enable parallel development across multiple work strea
 
 ## Stream A: Core Infrastructure (Foundation)
 
-- [ ] 1. Set up project structure and base classes
+- [x] 1. Set up project structure and base classes
   - Create directory structure for agents, runtime, tests
   - Implement BaseHydraAgent class with common functionality
   - Set up configuration management (HydraConfig)
   - Create data models (JobDescription, Resume, WorkflowState, etc.)
   - _Requirements: 14.1, 14.2, 18.1, 18.2_
 
-- [ ] 1.1 Implement base agent class
+- [x] 1.1 Implement base agent class
   - Create BaseHydraAgent with prompt loading, YAML validation
   - Implement _validate_schema method for common fields
   - Add error handling and retry logic
   - _Requirements: 14.1, 14.2, 17.1_
 
-- [ ] 1.2 Create data models
+- [x] 1.2 Create data models
   - Implement JobDescription, Resume, Employment dataclasses
   - Implement Requirement, Classification, Differentiator models
   - Implement WorkflowState with state machine transitions
   - Implement AuditIssue and error models
   - _Requirements: 2.1, 2.2, 16.1_
 
-- [ ] 1.3 Set up LLM client integration
+- [x] 1.3 Set up LLM client integration
   - Implement OpenRouter LLM client configuration
   - Add environment variable loading (OPENROUTER_API_KEY, OPENROUTER_MODEL)
   - Implement default model fallback
   - Add error handling for API failures
   - _Requirements: 18.1, 18.2, 18.3, 18.4, 18.5_
 
-- [ ]* 1.4 Write unit tests for base infrastructure
+- [x] 1.4 Write unit tests for base infrastructure
   - Test BaseHydraAgent YAML validation
   - Test data model serialization/deserialization
   - Test LLM client initialization
   - Test configuration loading
   - _Requirements: 14.1, 14.3, 18.1_
 
-- [ ] 2. Checkpoint - Ensure all tests pass
+- [x] 2. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ---

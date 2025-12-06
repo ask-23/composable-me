@@ -1,0 +1,20 @@
+{
+  "stream": "stream-b-claude",
+  "agent": "Claude",
+  "status": "not_started",
+  "started_at": null,
+  "last_updated": "2024-12-05T23:00:00Z",
+  "progress": "0%",
+  "current_task": "Waiting to start",
+  "completed_tasks": [],
+  "next_tasks": [
+    "Read assigned.md",
+    "Review requirements document",
+    "Review agent-interfaces.md",
+    "Refine Commander prompt",
+    "Implement Commander agent",
+    "Write tests"
+  ],
+  "blockers": [],
+  "notes": "Ready to start. See assigned.md for details."
+}

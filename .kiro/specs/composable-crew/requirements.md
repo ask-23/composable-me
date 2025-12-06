@@ -2,11 +2,11 @@
 
 ## Introduction
 
-Composable Me is a truth-constrained, multi-agent system for generating high-quality job applications. The system coordinates specialized AI agents through a central orchestrator (Commander) to analyze job descriptions, assess fit, extract truthful details through interviews, identify unique positioning, and generate tailored resumes and cover letters that pass AI detection while maintaining complete truthfulness.
+Composable Crew is a truth-constrained, multi-agent system for generating high-quality job applications. The system coordinates specialized AI agents through a central orchestrator (Commander) to analyze job descriptions, assess fit, extract truthful details through interviews, identify unique positioning, and generate tailored resumes and cover letters that pass AI detection while maintaining complete truthfulness.
 
 ## Glossary
 
-- **Hydra**: The multi-agent system consisting of Commander and specialized agents
+- **Composable Crew**: The multi-agent system consisting of Commander and specialized agents
 - **Commander**: The orchestrator agent that coordinates all other agents and enforces workflow
 - **Gap Analyzer**: Agent that maps job requirements to candidate experience
 - **Interrogator-Prepper**: Agent that generates interview questions to extract truthful details

@@ -1,0 +1,22 @@
+{
+  "stream": "stream-d-augment",
+  "agent": "Augment",
+  "status": "not_started",
+  "started_at": null,
+  "last_updated": "2024-12-05T23:00:00Z",
+  "progress": "0%",
+  "current_task": "Waiting to start",
+  "completed_tasks": [],
+  "next_tasks": [
+    "Read assigned.md",
+    "Review requirements document",
+    "Review agent-interfaces.md",
+    "Refine Interrogator-Prepper prompt",
+    "Implement Interrogator-Prepper agent",
+    "Write tests"
+  ],
+  "blockers": [
+    "Depends on Stream C (Gap Analyzer) completing first"
+  ],
+  "notes": "Ready to start once Gap Analyzer is available. See assigned.md for details."
+}

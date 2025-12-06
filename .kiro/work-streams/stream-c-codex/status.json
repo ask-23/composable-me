@@ -1,0 +1,20 @@
+{
+  "stream": "stream-c-codex",
+  "agent": "Codex",
+  "status": "not_started",
+  "started_at": null,
+  "last_updated": "2024-12-05T23:00:00Z",
+  "progress": "0%",
+  "current_task": "Waiting to start",
+  "completed_tasks": [],
+  "next_tasks": [
+    "Read assigned.md",
+    "Review requirements document",
+    "Review agent-interfaces.md",
+    "Refine Gap Analyzer prompt",
+    "Implement Gap Analyzer agent",
+    "Write tests"
+  ],
+  "blockers": [],
+  "notes": "Ready to start. See assigned.md for details."
+}
