@@ -1,0 +1,8 @@
+# This directory contains feature specifications
+# Each feature gets its own subdirectory:
+#   .kiro/specs/my-feature/requirements.md
+#   .kiro/specs/my-feature/design.md (optional)
+#   .kiro/specs/my-feature/tasks.md (optional)
+#
+# Use `npm run sync:linear` to create Linear stories from requirements.
+

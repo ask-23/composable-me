@@ -1,0 +1,67 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh" 2>/dev/null || true
+
+# Kiro Project Template - Pre-commit Hook
+# This hook runs checks before each commit.
+# It warns but does NOT block commits - fix issues when you can.
+
+echo "🔍 Running pre-commit checks..."
+echo ""
+
+WARNINGS=0
+
+# Check 1: Look for PII patterns (warning only)
+if git diff --cached --name-only | xargs grep -l -E '([a-zA-Z0-9._%+-]+@gmail\.com|[a-zA-Z0-9._%+-]+@yahoo\.com|[a-zA-Z0-9._%+-]+@hotmail\.com)' 2>/dev/null; then
+  echo "⚠️  WARNING: Possible real email addresses found in staged files"
+  echo "   Consider using placeholder emails like user@example.com"
+  WARNINGS=$((WARNINGS + 1))
+fi
+
+# Check 2: Look for console.log with potential PII
+if git diff --cached | grep -E 'console\.log.*\$\{(email|name|user|phone)' 2>/dev/null; then
+  echo "⚠️  WARNING: Possible PII logging detected"
+  echo "   Review console.log statements for sensitive data"
+  WARNINGS=$((WARNINGS + 1))
+fi
+
+# Check 3: Look for prohibited file patterns
+PROHIBITED=$(git diff --cached --name-only | grep -E '(scratch\.txt|chat-.*\.md|.*-chat-.*\.md|TASK-.*-SUMMARY\.md)' 2>/dev/null || true)
+if [ -n "$PROHIBITED" ]; then
+  echo "⚠️  WARNING: Potentially temporary files being committed:"
+  echo "$PROHIBITED"
+  echo "   These are usually working notes, not documentation"
+  WARNINGS=$((WARNINGS + 1))
+fi
+
+# Check 4: Run linter if available (graceful skip if not configured)
+if [ -f "package.json" ] && grep -q '"lint"' package.json 2>/dev/null; then
+  if npm run lint --silent 2>/dev/null; then
+    echo "✅ Linter passed"
+  else
+    echo "⚠️  WARNING: Linter found issues"
+    WARNINGS=$((WARNINGS + 1))
+  fi
+fi
+
+# Check 5: Run formatter check if available (graceful skip if not configured)
+if [ -f "package.json" ] && grep -q '"format:check"' package.json 2>/dev/null; then
+  if npm run format:check --silent 2>/dev/null; then
+    echo "✅ Formatting check passed"
+  else
+    echo "⚠️  WARNING: Formatting issues found (run npm run format to fix)"
+    WARNINGS=$((WARNINGS + 1))
+  fi
+fi
+
+# Summary
+echo ""
+if [ $WARNINGS -gt 0 ]; then
+  echo "📊 Pre-commit completed with $WARNINGS warning(s)"
+  echo "   Commit will proceed - please address warnings when possible"
+else
+  echo "✅ Pre-commit checks passed"
+fi
+
+# Always exit 0 - we warn but don't block
+exit 0
+

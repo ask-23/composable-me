@@ -1,0 +1,9 @@
+{
+  "projectName": "Your Project Name",
+  "projectId": "your-linear-project-uuid",
+  "teamId": "your-linear-team-uuid",
+  "featureMapping": {
+    "example-feature": "Example Feature Display Name"
+  }
+}
+

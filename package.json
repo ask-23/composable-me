@@ -1,0 +1,17 @@
+{
+  "name": "kiro-project-template",
+  "version": "1.0.0",
+  "description": "Foundation template for Kiro-enabled projects",
+  "scripts": {
+    "sync:linear": "node scripts/sync-kiro-to-linear.js",
+    "sync:linear:dry": "node scripts/sync-kiro-to-linear.js --dry-run",
+    "prepare": "husky install || true"
+  },
+  "devDependencies": {
+    "husky": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+
