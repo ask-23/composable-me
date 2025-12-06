@@ -1,6 +1,6 @@
 # Product Overview
 
-Composable Me is a truth-constrained, multi-agent system for generating high-quality job applications. It's a personal job search tool designed for senior engineers and technical leaders.
+Composable Crew is a truth-constrained, multi-agent system for generating high-quality job applications. It's a personal job search tool designed for senior engineers and technical leaders.
 
 ## Core Value Proposition
 

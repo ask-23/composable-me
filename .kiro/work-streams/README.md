@@ -39,6 +39,15 @@ Each stream has its own directory:
 ### 4. Interfaces
 All agents communicate via structured YAML. See `stream-a-kiro/agent-interfaces.md` for complete specifications.
 
+### 5. Status Protocol
+**CRITICAL:** All agents MUST update their `status.json` file when:
+- Starting work (change to `in_progress`)
+- Completing tasks (update `completed_tasks`)
+- Hitting blockers (change to `blocked`)
+- Finishing work (change to `completed`)
+
+See `.kiro/steering/work-stream-protocol.md` for complete protocol.
+
 ## Getting Started
 
 ### If you're Stream A (Kiro)
@@ -142,6 +151,18 @@ Stream A will:
 1. Stream B (Commander) should start immediately - it's blocking everything
 2. Stream C (Gap Analyzer) should start immediately - it's on the critical path
 3. Other streams can start once their dependencies are clear
+
+## Coordinator Monitoring
+
+Check all stream statuses:
+```bash
+for stream in .kiro/work-streams/stream-*/status.json; do
+    name=$(basename $(dirname $stream))
+    status=$(cat $stream | jq -r '.status')
+    progress=$(cat $stream | jq -r '.progress')
+    echo "$name: $status ($progress)"
+done
+```
 
 ## Questions?
 

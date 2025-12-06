@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "name": "Stream Completion Review",
+  "description": "Automatically reviews streaming completion responses when they finish to ensure quality, accuracy, and adherence to project guidelines",
+  "version": "1",
+  "when": {
+    "type": "fileCreated",
+    "patterns": []
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Review the completion response that was just generated. Check for:\n1. Accuracy and correctness of information\n2. Adherence to project guidelines and steering rules\n3. Code quality and best practices\n4. Completeness of the response\n5. Any potential issues or improvements\n\nProvide a brief assessment and flag any concerns that should be addressed."
+  }
+}

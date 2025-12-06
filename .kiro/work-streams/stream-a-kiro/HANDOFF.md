@@ -222,24 +222,38 @@ output1: value
     # Add more tests...
 ```
 
-### Step 4: Update Status
+### Step 4: Update Status (CRITICAL!)
 
-Update your `stream-X/status.json`:
+**BEFORE you start coding**, update your `stream-X/status.json`:
 
 ```json
 {
   "stream": "stream-X",
+  "agent": "Your Agent Name",
   "status": "in_progress",
-  "started_at": "2024-01-01T00:00:00Z",
-  "progress": {
-    "agent_class": "completed",
-    "prompt": "completed",
-    "tests": "in_progress"
-  },
+  "started_at": "2024-12-06T01:00:00Z",
+  "last_updated": "2024-12-06T01:00:00Z",
+  "progress": "5%",
+  "current_task": "Reading requirements and interface specs",
+  "completed_tasks": [],
+  "next_tasks": [
+    "Create agent class",
+    "Write prompt",
+    "Implement execute()",
+    "Write tests"
+  ],
   "blockers": [],
-  "questions": []
+  "notes": "Starting work on Stream X"
 }
 ```
+
+**As you work**, update regularly:
+- After completing each task, add to `completed_tasks`
+- Update `progress` percentage
+- Update `current_task` to what you're working on now
+- Update `last_updated` timestamp
+
+**See `.kiro/steering/work-stream-protocol.md` for complete status protocol.**
 
 ### Step 5: Complete and Handoff
 
