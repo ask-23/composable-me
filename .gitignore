@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist/
+build/
+*.log
+
+# Temporary files (NEVER commit these)
+scratch.txt
+*.scratch
+*.tmp
+*.temp
+1.hold
+
+# Chat logs and working notes (NEVER commit)
+*-chat-*.md
+chat-*.md
+TASK-*-SUMMARY.md
+IMPLEMENTATION-SUMMARY.md
+
+# Exports and data files
+*.csv
+*.pdf
+*.xlsx
+
+# Wrangler (Cloudflare Workers)
+.wrangler/
+
+# Tool state
+.claude-flow/
+.swarm/
+
