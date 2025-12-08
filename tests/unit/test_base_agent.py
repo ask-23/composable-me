@@ -176,26 +176,33 @@ confidence: "high"
         agent = OtherTestAgent(mock_llm)
         assert agent._needs_style_guide() is False
     
-    def test_execute_with_retry_success_first_attempt(self, test_agent):
+    @patch('runtime.crewai.base_agent.Crew')
+    def test_execute_with_retry_success_first_attempt(self, mock_crew_class, test_agent):
         """Test execute_with_retry succeeds on first attempt"""
-        mock_task = Mock()
-        mock_task.execute.return_value = """
+        # Mock the Crew instance and its kickoff method
+        mock_crew_instance = Mock()
+        mock_crew_instance.kickoff.return_value = """
 agent: Test Agent
 timestamp: 2024-01-01T00:00:00
 confidence: 0.95
 """
+        mock_crew_class.return_value = mock_crew_instance
+        
+        mock_task = Mock()
+        mock_task.agent = Mock()
         
         result = test_agent.execute_with_retry(mock_task, max_retries=2)
         
         assert result["agent"] == "Test Agent"
-        assert mock_task.execute.call_count == 1
+        assert mock_crew_instance.kickoff.call_count == 1
     
-    def test_execute_with_retry_success_after_retry(self, test_agent):
+    @patch('runtime.crewai.base_agent.Crew')
+    def test_execute_with_retry_success_after_retry(self, mock_crew_class, test_agent):
         """Test execute_with_retry succeeds after retry"""
-        mock_task = Mock()
-        
+        # Mock the Crew instance and its kickoff method
+        mock_crew_instance = Mock()
         # First call fails, second succeeds
-        mock_task.execute.side_effect = [
+        mock_crew_instance.kickoff.side_effect = [
             Exception("First attempt failed"),
             """
 agent: Test Agent
@@ -203,18 +210,28 @@ timestamp: 2024-01-01T00:00:00
 confidence: 0.95
 """
         ]
+        mock_crew_class.return_value = mock_crew_instance
+        
+        mock_task = Mock()
+        mock_task.agent = Mock()
         
         result = test_agent.execute_with_retry(mock_task, max_retries=2)
         
         assert result["agent"] == "Test Agent"
-        assert mock_task.execute.call_count == 2
+        assert mock_crew_instance.kickoff.call_count == 2
     
-    def test_execute_with_retry_fails_after_max_retries(self, test_agent):
+    @patch('runtime.crewai.base_agent.Crew')
+    def test_execute_with_retry_fails_after_max_retries(self, mock_crew_class, test_agent):
         """Test execute_with_retry fails after max retries"""
+        # Mock the Crew instance and its kickoff method
+        mock_crew_instance = Mock()
+        mock_crew_instance.kickoff.side_effect = Exception("Always fails")
+        mock_crew_class.return_value = mock_crew_instance
+        
         mock_task = Mock()
-        mock_task.execute.side_effect = Exception("Always fails")
+        mock_task.agent = Mock()
         
         with pytest.raises(ValidationError, match="failed after 3 attempts"):
             test_agent.execute_with_retry(mock_task, max_retries=2)
         
-        assert mock_task.execute.call_count == 3
+        assert mock_crew_instance.kickoff.call_count == 3

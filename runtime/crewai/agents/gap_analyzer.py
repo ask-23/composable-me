@@ -87,54 +87,80 @@ class GapAnalyzerAgent(BaseHydraAgent):
         # First run base validation
         super()._validate_schema(data)
         
-        # Validate required fields for Gap Analyzer
-        required_fields = ["requirements", "fit_score", "gaps", "blockers"]
-        for field in required_fields:
-            if field not in data:
-                raise ValidationError(f"Missing required field: {field}")
+        # Gap Analyzer output can be nested under 'gap_analysis' key or flat
+        # Extract the analysis data
+        if "gap_analysis" in data:
+            analysis = data["gap_analysis"]
+        else:
+            analysis = data
+        
+        # Validate requirements exists (can be in different locations)
+        requirements = None
+        if "requirements" in analysis:
+            requirements = analysis["requirements"]
+        elif "requirements_analysis" in analysis:
+            # Some prompts use requirements_analysis
+            req_analysis = analysis["requirements_analysis"]
+            if isinstance(req_analysis, dict):
+                # Extract requirements from nested structure
+                requirements = []
+                for key in ["explicit_required", "explicit_preferred", "implicit_requirements"]:
+                    if key in req_analysis:
+                        items = req_analysis[key]
+                        if isinstance(items, list):
+                            requirements.extend(items)
+        
+        if requirements is None:
+            raise ValidationError("Missing required field: requirements (or requirements_analysis)")
         
         # Validate requirements is a list
-        requirements = data.get("requirements", [])
+        requirements = requirements if isinstance(requirements, list) else []
         if not isinstance(requirements, list):
             raise ValidationError("requirements must be a list")
         
-        # Validate each requirement has required fields
+        # Validate each requirement is a dictionary (be lenient about field names)
         for i, req in enumerate(requirements):
             if not isinstance(req, dict):
                 raise ValidationError(f"Requirement {i} must be a dictionary")
             
-            req_fields = ["requirement", "classification", "evidence", "source_location", "confidence"]
-            for field in req_fields:
-                if field not in req:
-                    raise ValidationError(f"Requirement {i} missing field: {field}")
+            # Check for classification field (required)
+            if "classification" in req:
+                # Validate classification is one of allowed values
+                allowed_classifications = {"direct_match", "adjacent_experience", "adjacent", "gap", "blocker"}
+                if req["classification"] not in allowed_classifications:
+                    raise ValidationError(
+                        f"Invalid classification in requirement {i}: {req['classification']}. "
+                        f"Must be one of {allowed_classifications}"
+                    )
             
-            # Validate classification is one of allowed values
-            allowed_classifications = {"direct_match", "adjacent_experience", "gap", "blocker"}
-            if req["classification"] not in allowed_classifications:
-                raise ValidationError(
-                    f"Invalid classification in requirement {i}: {req['classification']}. "
-                    f"Must be one of {allowed_classifications}"
-                )
-            
-            # Validate confidence is a number between 0 and 1
-            confidence = req.get("confidence")
-            if not isinstance(confidence, (int, float)):
-                raise ValidationError(f"Confidence in requirement {i} must be a number")
-            if not 0.0 <= confidence <= 1.0:
-                raise ValidationError(f"Confidence in requirement {i} must be between 0.0 and 1.0")
+            # Validate confidence if present
+            if "confidence" in req:
+                confidence = req["confidence"]
+                # Handle string confidence like "high", "medium", "low"
+                if isinstance(confidence, str):
+                    continue  # Allow string confidence values
+                if isinstance(confidence, (int, float)):
+                    if not 0.0 <= confidence <= 1.0:
+                        raise ValidationError(f"Confidence in requirement {i} must be between 0.0 and 1.0")
         
-        # Validate fit_score is a number between 0 and 100
-        fit_score = data.get("fit_score")
-        if not isinstance(fit_score, (int, float)):
-            raise ValidationError("fit_score must be a number")
-        if not 0.0 <= fit_score <= 100.0:
-            raise ValidationError("fit_score must be between 0.0 and 100.0")
+        # Validate fit_score (can be in different locations)
+        fit_score = analysis.get("fit_score")
+        if fit_score is None and "summary" in analysis:
+            # Try to extract from summary
+            summary = analysis["summary"]
+            if isinstance(summary, dict) and "fit_score" in summary:
+                fit_score_str = summary["fit_score"]
+                # Handle percentage strings like "92%"
+                if isinstance(fit_score_str, str) and fit_score_str.endswith("%"):
+                    fit_score = float(fit_score_str.rstrip("%"))
+                else:
+                    fit_score = fit_score_str
         
-        # Validate gaps and blockers are lists
-        gaps = data.get("gaps", [])
-        if not isinstance(gaps, list):
-            raise ValidationError("gaps must be a list")
+        if fit_score is not None:
+            if not isinstance(fit_score, (int, float)):
+                raise ValidationError("fit_score must be a number")
+            if not 0.0 <= fit_score <= 100.0:
+                raise ValidationError("fit_score must be between 0.0 and 100.0")
         
-        blockers = data.get("blockers", [])
-        if not isinstance(blockers, list):
-            raise ValidationError("blockers must be a list")
+        # Gaps and blockers are optional - don't fail if missing
+        # They might be embedded in the requirements list

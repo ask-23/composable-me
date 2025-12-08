@@ -153,7 +153,26 @@ class HydraWorkflow:
         self.current_state = WorkflowState.INTERROGATION
         self._log("Executing Interrogation Preparation")
 
-        interrogation_context = {**context, "gap_analysis": gap_result}
+        # Extract gaps from gap_result for interrogation context
+        # Handle both flat and nested structures
+        gaps = []
+        if "gaps" in gap_result:
+            gaps = gap_result["gaps"]
+        elif "gap_analysis" in gap_result:
+            analysis = gap_result["gap_analysis"]
+            if "gaps" in analysis:
+                gaps = analysis["gaps"]
+            # Also extract requirements classified as gaps
+            if "requirements" in analysis:
+                for req in analysis["requirements"]:
+                    if isinstance(req, dict) and req.get("classification") == "gap":
+                        gaps.append(req)
+        
+        interrogation_context = {
+            **context,
+            "gap_analysis": gap_result,
+            "gaps": gaps if gaps else []  # Provide empty list if no gaps found
+        }
         result = self.interrogator_prepper.execute(interrogation_context)
         self.intermediate_results["interrogation"] = result
         return result
