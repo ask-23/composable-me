@@ -11,6 +11,7 @@ from .llm_client import (
     LLMClientError,
     LLMRetryHandler,
 )
+from . import cli
 from .models import (
     WorkflowState,
     WorkflowStatus,
@@ -39,6 +40,7 @@ __all__ = [
     "validate_model_name",
     "LLMClientError",
     "LLMRetryHandler",
+    "cli",
     "WorkflowState",
     "WorkflowStatus",
     "JobDescription",

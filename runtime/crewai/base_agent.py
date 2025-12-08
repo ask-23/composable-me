@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 from abc import ABC, abstractmethod
 import yaml
-from crewai import Agent, Task, LLM
+from crewai import Agent, Task, Crew, Process, LLM
 
 
 class ValidationError(Exception):
@@ -131,8 +131,17 @@ class BaseHydraAgent(ABC):
         context: Optional[List[Task]] = None
     ) -> Task:
         """Create CrewAI task for this agent"""
+        # Add required base fields to task description
+        enhanced_description = f"""{description}
+
+IMPORTANT: Your output MUST include these required fields at the top level:
+- agent: "{self.role}"
+- timestamp: Current ISO-8601 timestamp (e.g., "2025-12-08T12:00:00Z")
+- confidence: A number between 0.0 and 1.0 indicating your confidence in the analysis
+"""
+        
         return Task(
-            description=description,
+            description=enhanced_description,
             expected_output=self.expected_output,
             agent=self.create_agent(),
             context=context or []
@@ -152,7 +161,22 @@ class BaseHydraAgent(ABC):
             ValidationError: If output is invalid
         """
         try:
-            parsed = yaml.safe_load(output)
+            # Strip markdown code fences if present (LLMs often wrap YAML in ```yaml ... ```)
+            cleaned_output = output.strip()
+            if cleaned_output.startswith("```yaml"):
+                # Remove opening ```yaml and closing ```
+                cleaned_output = cleaned_output[7:]  # Remove ```yaml
+                if cleaned_output.endswith("```"):
+                    cleaned_output = cleaned_output[:-3]  # Remove closing ```
+                cleaned_output = cleaned_output.strip()
+            elif cleaned_output.startswith("```"):
+                # Remove generic code fences
+                cleaned_output = cleaned_output[3:]
+                if cleaned_output.endswith("```"):
+                    cleaned_output = cleaned_output[:-3]
+                cleaned_output = cleaned_output.strip()
+            
+            parsed = yaml.safe_load(cleaned_output)
             
             if not isinstance(parsed, dict):
                 raise ValidationError("Output must be a YAML dictionary")
@@ -212,8 +236,14 @@ class BaseHydraAgent(ABC):
         
         for attempt in range(max_retries + 1):
             try:
-                # Execute task
-                result = task.execute()
+                # Execute task via a minimal Crew (Task.execute is not available in newer CrewAI)
+                crew = Crew(
+                    agents=[task.agent],
+                    tasks=[task],
+                    process=Process.sequential,
+                    verbose=False,
+                )
+                result = crew.kickoff()
                 
                 # Validate output
                 validated = self.validate_output(str(result))

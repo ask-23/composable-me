@@ -2,7 +2,10 @@
 # Composable Me Hydra — Run Script
 #
 # Usage:
-#   ./run.sh examples/sample_jd.md examples/sample_resume.md
+#   ./run.sh --jd examples/sample_jd.md \
+#            --resume examples/sample_resume.md \
+#            --sources sources/ \
+#            --out output/
 #
 # Environment:
 #   OPENROUTER_API_KEY: Required
@@ -24,29 +27,6 @@ if [ -z "$OPENROUTER_API_KEY" ]; then
 fi
 
 # Check args
-if [ $# -lt 2 ]; then
-    echo "Usage: $0 <job_description.md> <resume.md> [interview_notes.md]"
-    echo ""
-    echo "Example:"
-    echo "  $0 examples/sample_jd.md examples/sample_resume.md"
-    exit 1
-fi
-
-JD="$1"
-RESUME="$2"
-NOTES="${3:-}"
-
-# Check files exist
-if [ ! -f "$JD" ]; then
-    echo "ERROR: Job description not found: $JD"
-    exit 1
-fi
-
-if [ ! -f "$RESUME" ]; then
-    echo "ERROR: Resume not found: $RESUME"
-    exit 1
-fi
-
 # Create venv if needed
 if [ ! -d ".venv" ]; then
     echo "Creating virtual environment..."
@@ -62,20 +42,12 @@ if ! python -c "import crewai" 2>/dev/null; then
     pip install -r requirements.txt
 fi
 
-# Run the crew
 echo ""
 echo "============================================================"
-echo "COMPOSABLE ME HYDRA — Starting CrewAI Pipeline"
+echo "COMPOSABLE ME HYDRA — Starting CLI"
 echo "============================================================"
-echo "JD: $JD"
-echo "Resume: $RESUME"
-echo "Notes: ${NOTES:-none}"
 echo "Model: ${OPENROUTER_MODEL:-anthropic/claude-3.5-sonnet}"
 echo "============================================================"
 echo ""
 
-if [ -n "$NOTES" ] && [ -f "$NOTES" ]; then
-    python runtime/crewai/quick_crew.py --jd "$JD" --resume "$RESUME" --notes "$NOTES"
-else
-    python runtime/crewai/quick_crew.py --jd "$JD" --resume "$RESUME"
-fi
+python runtime/crewai/cli.py "$@"
