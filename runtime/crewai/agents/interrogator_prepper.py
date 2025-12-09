@@ -15,7 +15,7 @@ class InterrogatorPrepperAgent(BaseHydraAgent):
     
     role = "Interrogator-Prepper"
     goal = "Generate targeted interview questions to extract truthful details and fill experience gaps"
-    expected_output = "YAML with structured questions and interview notes processing"
+    expected_output = "JSON with structured questions and interview notes processing"
     
     def __init__(self, llm: LLM):
         """

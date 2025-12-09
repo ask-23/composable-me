@@ -16,7 +16,7 @@ class DifferentiatorAgent(BaseHydraAgent):
     
     role = "Differentiator"
     goal = "Identify unique value propositions and positioning angles that differentiate the candidate"
-    expected_output = "YAML with differentiators, positioning angles, and application guidance"
+    expected_output = "JSON with differentiators, positioning angles, and application guidance"
     
     def __init__(self, llm: LLM):
         """

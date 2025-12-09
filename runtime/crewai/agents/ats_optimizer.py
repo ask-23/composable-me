@@ -17,7 +17,7 @@ class ATSOptimizerAgent(BaseHydraAgent):
     
     role = "ATS Optimizer"
     goal = "Ensure documents pass automated screening systems without sacrificing human readability"
-    expected_output = "YAML with ATS analysis, keyword coverage, format verification, and optimized document"
+    expected_output = "JSON with ATS analysis, keyword coverage, format verification, and optimized document"
     
     def __init__(self, llm: LLM):
         """

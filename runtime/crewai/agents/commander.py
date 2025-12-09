@@ -18,7 +18,7 @@ class CommanderAgent(BaseHydraAgent):
     
     role = "Commander"
     goal = "Evaluate job fit and make strategic decisions about proceeding with applications"
-    expected_output = "YAML decision with action, fit analysis, and next step"
+    expected_output = "JSON decision with action, fit analysis, and next step"
     
     def __init__(self, llm: LLM):
         """

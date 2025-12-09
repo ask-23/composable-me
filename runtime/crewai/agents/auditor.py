@@ -16,7 +16,7 @@ class AuditorSuiteAgent(BaseHydraAgent):
     
     role = "Auditor Suite"
     goal = "Verify all outputs are truthful, human-sounding, compliant, and ATS-ready"
-    expected_output = "YAML with comprehensive audit report including truth, tone, ATS, and compliance audits"
+    expected_output = "JSON with comprehensive audit report including truth, tone, ATS, and compliance audits"
     
     def __init__(self, llm: LLM):
         """
