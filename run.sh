@@ -7,21 +7,34 @@
 #            --sources sources/ \
 #            --out output/
 #
-# Environment:
-#   OPENROUTER_API_KEY: Required
-#   OPENROUTER_MODEL: Optional (default: anthropic/claude-3.5-sonnet)
+# Environment (set at least one API key):
+#   TOGETHER_API_KEY: Recommended (Together AI)
+#   CHUTES_API_KEY: Alternative (Chutes.ai)
+#   OPENROUTER_API_KEY: Alternative (OpenRouter)
+# Optional model overrides:
+#   TOGETHER_MODEL / CHUTES_MODEL / OPENROUTER_MODEL
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Check for API key
-if [ -z "$OPENROUTER_API_KEY" ]; then
-    echo "ERROR: OPENROUTER_API_KEY not set"
+# Choose provider + model based on available keys (matches runtime/crewai/llm_client.py)
+if [ -n "$TOGETHER_API_KEY" ]; then
+    PROVIDER="Together AI"
+    MODEL="${TOGETHER_MODEL:-${OPENROUTER_MODEL:-meta-llama/Llama-3.3-70B-Instruct-Turbo}}"
+elif [ -n "$CHUTES_API_KEY" ]; then
+    PROVIDER="Chutes.ai"
+    MODEL="${CHUTES_MODEL:-${OPENROUTER_MODEL:-deepseek-ai/DeepSeek-V3.1}}"
+elif [ -n "$OPENROUTER_API_KEY" ]; then
+    PROVIDER="OpenRouter"
+    MODEL="${OPENROUTER_MODEL:-anthropic/claude-sonnet-4.5}"
+else
+    echo "ERROR: No LLM API key found."
     echo ""
-    echo "Get a key from https://openrouter.ai/keys"
-    echo "Then run:"
+    echo "Set one of:"
+    echo "  export TOGETHER_API_KEY='tgp_v1_...'"
+    echo "  export CHUTES_API_KEY='your-key'"
     echo "  export OPENROUTER_API_KEY='sk-or-...'"
     exit 1
 fi
@@ -46,8 +59,9 @@ echo ""
 echo "============================================================"
 echo "COMPOSABLE ME HYDRA — Starting CLI"
 echo "============================================================"
-echo "Model: ${OPENROUTER_MODEL:-anthropic/claude-3.5-sonnet}"
+echo "Provider: ${PROVIDER}"
+echo "Model: ${MODEL}"
 echo "============================================================"
 echo ""
 
-python runtime/crewai/cli.py "$@"
+python -m runtime.crewai.cli "$@"
