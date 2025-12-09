@@ -92,7 +92,7 @@ Example:
 
 Prioritize based on JD emphasis:
 
-```yaml
+```
 if jd_emphasizes: "cloud architecture"
   order:
     1. AWS/Cloud achievements
@@ -195,7 +195,7 @@ Best,
 
 ### Response Tiers
 
-```yaml
+```
 tier_1_interested:
   signals: ["Strong fit", "Good company", "Appropriate level"]
   response: "Express interest, ask clarifying questions"
@@ -252,53 +252,61 @@ Include occasional:
 
 ## Output Format
 
-```yaml
-tailored_output:
-  meta:
-    role: "Senior Platform Engineer"
-    company: "TechCorp"
-    version: 1
-    generated: "2025-12-02"
-  
-  resume:
-    format: "markdown"
-    content: |
-      [Full resume content]
-    
-    notes:
-      - "Emphasized cloud architecture per JD priority"
-      - "Used 'developer velocity' language from JD"
-      - "Quantified all major achievements"
-  
-  cover_letter:
-    format: "markdown"
-    content: |
-      [Full cover letter content]
-    
-    notes:
-      - "Opened with bottleneck elimination angle"
-      - "Referenced their engineering blog post"
-      - "Connected SOC2 experience to their compliance mention"
-  
-  recruiter_reply:  # if requested
-    format: "text"
-    content: |
-      [Reply content]
-  
-  source_mapping:
-    # Every claim traced to source
-    - claim: "Led migration of 200+ services"
-      source: "resume_merged.md, T-Mobile section"
-    
-    - claim: "SOC2 audit on first attempt"
-      source: "interview_notes, compliance theme"
+Return ONLY valid JSON matching this structure:
+
+```json
+{
+  "agent": "Tailoring Agent",
+  "timestamp": "2025-12-08T12:00:00Z",
+  "confidence": 0.95,
+  "tailored_output": {
+    "meta": {
+      "role": "Senior Platform Engineer",
+      "company": "TechCorp",
+      "version": 1,
+      "generated": "2025-12-02"
+    },
+    "resume": {
+      "format": "markdown",
+      "content": "[Full resume content as a single string with \\n for line breaks]",
+      "notes": [
+        "Emphasized cloud architecture per JD priority",
+        "Used 'developer velocity' language from JD",
+        "Quantified all major achievements"
+      ]
+    },
+    "cover_letter": {
+      "format": "markdown",
+      "content": "[Full cover letter content as a single string with \\n for line breaks]",
+      "notes": [
+        "Opened with bottleneck elimination angle",
+        "Referenced their engineering blog post",
+        "Connected SOC2 experience to their compliance mention"
+      ]
+    },
+    "recruiter_reply": {
+      "format": "text",
+      "content": "[Reply content if requested]"
+    },
+    "source_mapping": [
+      {
+        "claim": "Led migration of 200+ services",
+        "source": "resume_merged.md, T-Mobile section"
+      },
+      {
+        "claim": "SOC2 audit on first attempt",
+        "source": "interview_notes, compliance theme"
+      }
+    ]
+  }
+}
 ```
 
 ## Verification Before Output
 
 Run this checklist:
 
-```yaml
+```
 pre_output_check:
   truth:
     - [ ] All claims traceable to sources

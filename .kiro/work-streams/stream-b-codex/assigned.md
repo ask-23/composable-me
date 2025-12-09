@@ -1,6 +1,6 @@
 # Stream B: Commander Agent
 
-**Agent:** Claude  
+**Agent:** Codex  
 **Status:** Not Started  
 **Priority:** High (blocking other streams)
 
@@ -106,13 +106,37 @@ Create tests for:
 3. `tests/test_commander.py` - Unit tests
 4. `stream-b-claude/completed/DONE.md` - Summary of what you built
 
-## Status Updates
+## Status Updates (CRITICAL!)
 
-Update `stream-b-claude/status.json` as you progress:
-- When you start
-- When you hit blockers
-- When you complete tasks
-- When you're done
+**BEFORE you write any code**, update your status to `in_progress`:
+
+```bash
+python3 .kiro/work-streams/update_status.py stream-b-codex in_progress \
+    --task "Reading requirements and interface specs"
+```
+
+**As you work**, update regularly:
+
+```bash
+# After completing a task
+python3 .kiro/work-streams/update_status.py stream-b-codex in_progress \
+    --add-completed "Created agent class" \
+    --task "Writing agent prompt" \
+    --progress "40%"
+```
+
+**When you finish**, mark as completed:
+
+```bash
+python3 .kiro/work-streams/update_status.py stream-b-codex completed
+```
+
+**See `.kiro/work-streams/STATUS-TRACKING-GUIDE.md` for complete instructions.**
+
+This enables automation hooks that:
+- ✅ Notify coordinator when you start/finish
+- ✅ Trigger integration workflow on completion
+- ✅ Unblock dependent streams when you're done
 
 ## Questions?
 

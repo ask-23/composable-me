@@ -142,7 +142,7 @@ def get_llm() -> LLM:
         print("Run: export OPENROUTER_API_KEY='sk-or-...'")
         sys.exit(1)
 
-    model = os.environ.get("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
+    model = os.environ.get("OPENROUTER_MODEL", "anthropic/claude-sonnet-4.5")
 
     return LLM(
         model=f"openrouter/{model}",
