@@ -38,15 +38,21 @@ Identify and document any concerning patterns:
 - Misaligned company culture indicators
 
 ## Output Schema
-Respond ONLY with a valid YAML object matching this exact structure:
+Respond ONLY with valid JSON matching this exact structure:
 
-```yaml
-action: "proceed"|"pass"|"discuss"
-fit_analysis:
-  fit_percentage: number (0-100)
-  auto_reject_triggered: boolean
-  red_flags: string[]
-next_step: string
+```json
+{
+  "agent": "Commander",
+  "timestamp": "2025-12-08T12:00:00Z",
+  "confidence": 0.9,
+  "action": "proceed|pass|discuss",
+  "fit_analysis": {
+    "fit_percentage": 85,
+    "auto_reject_triggered": false,
+    "red_flags": ["list", "of", "red", "flags"]
+  },
+  "next_step": "description of next step"
+}
 ```
 
 ## Instructions
@@ -56,4 +62,4 @@ next_step: string
 4. Calculate a fit percentage based on gap severity and quantity
 5. Determine the appropriate action based on thresholds
 6. Recommend a next step for the workflow
-7. Respond with ONLY the YAML output, no other text
+7. Respond with ONLY valid JSON, no other text

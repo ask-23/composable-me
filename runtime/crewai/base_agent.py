@@ -153,7 +153,7 @@ Return ONLY valid JSON. Do not include any text before or after the JSON object.
     
     def validate_output(self, output: str) -> Dict[str, Any]:
         """
-        Validate and parse agent output with robust error handling for open-source models.
+        Validate and parse agent output as JSON.
         
         Args:
             output: Raw output string from agent
@@ -162,157 +162,44 @@ Return ONLY valid JSON. Do not include any text before or after the JSON object.
             Parsed and validated output dictionary
             
         Raises:
-            ValidationError: If output is invalid after all cleanup attempts
+            ValidationError: If output is invalid JSON
         """
         import re
         
         # Strip markdown code fences
         cleaned_output = output.strip()
-        if cleaned_output.startswith("```yaml") or cleaned_output.startswith("```yml"):
-            cleaned_output = re.sub(r'^```ya?ml\s*\n?', '', cleaned_output)
+        if cleaned_output.startswith("```json"):
+            cleaned_output = re.sub(r'^```json\s*\n?', '', cleaned_output)
             cleaned_output = re.sub(r'\n?```\s*$', '', cleaned_output)
         elif cleaned_output.startswith("```"):
             cleaned_output = re.sub(r'^```\s*\n?', '', cleaned_output)
             cleaned_output = re.sub(r'\n?```\s*$', '', cleaned_output)
         cleaned_output = cleaned_output.strip()
         
-        # Aggressive YAML cleaning for open-source models
-        lines = cleaned_output.split('\n')
-        cleaned_lines = []
+        # Try to extract JSON if there's surrounding text
+        # Look for first { and last }
+        first_brace = cleaned_output.find('{')
+        last_brace = cleaned_output.rfind('}')
         
-        for line in lines:
-            # Skip empty lines at start
-            if not cleaned_lines and not line.strip():
-                continue
-            
-            # Remove inline comments in list items: - "value" (comment)
-            line = re.sub(r'^(\s*-\s*"[^"]+")(\s*\([^)]+\).*)?$', r'\1', line)
-            line = re.sub(r'^(\s*-\s+[^\s(#]+)(\s*\([^)]+\).*)?$', r'\1', line)
-            
-            # Remove trailing comments after values
-            line = re.sub(r'(\s*:\s*[^#]+?)\s*#.*$', r'\1', line)
-            
-            # Fix common quoting issues - unquoted colons in values
-            if ':' in line and not line.strip().startswith('-'):
-                parts = line.split(':', 1)
-                if len(parts) == 2:
-                    key_part = parts[0]
-                    value_part = parts[1].strip()
-                    # If value has unquoted special chars, try to quote it
-                    if value_part and not (value_part.startswith('"') or value_part.startswith("'") or 
-                                          value_part.startswith('[') or value_part.startswith('{')):
-                        # Check if it looks like it needs quoting
-                        if ':' in value_part or '@' in value_part or '|' in value_part:
-                            value_part = f'"{value_part}"'
-                            line = f"{key_part}: {value_part}"
-            
-            # Replace tabs with spaces
-            line = line.replace('\t', '  ')
-            
-            # Remove any weird unicode characters that break YAML
-            line = line.encode('ascii', 'ignore').decode('ascii')
-            
-            cleaned_lines.append(line)
+        if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+            cleaned_output = cleaned_output[first_brace:last_brace + 1]
         
-        cleaned_output = '\n'.join(cleaned_lines)
-        
-        # Try multiple parsing strategies
-        parsed = None
-        last_error = None
-        
-        # Strategy 1: Direct parse
+        # Try to parse JSON
         try:
-            parsed = yaml.safe_load(cleaned_output)
-        except yaml.YAMLError as e:
-            last_error = e
-            
-            # Strategy 2: Fix indentation issues
+            parsed = json.loads(cleaned_output)
+        except json.JSONDecodeError as e:
+            # Try to fix common JSON issues
             try:
-                # Normalize indentation to 2 spaces
-                fixed_lines = []
-                for line in cleaned_lines:
-                    if line.strip():
-                        # Count leading spaces
-                        leading = len(line) - len(line.lstrip())
-                        # Normalize to multiples of 2
-                        normalized_leading = (leading // 2) * 2
-                        fixed_lines.append(' ' * normalized_leading + line.lstrip())
-                    else:
-                        fixed_lines.append(line)
-                
-                cleaned_output = '\n'.join(fixed_lines)
-                parsed = yaml.safe_load(cleaned_output)
-            except yaml.YAMLError as e2:
-                last_error = e2
-                
-                # Strategy 3: Try to extract just the YAML block if there's extra text
-                try:
-                    # Look for the first line that looks like YAML (key: value)
-                    yaml_start = 0
-                    for i, line in enumerate(fixed_lines):
-                        if ':' in line and not line.strip().startswith('#'):
-                            yaml_start = i
-                            break
-                    
-                    # Look for the last line that looks like YAML
-                    yaml_end = len(fixed_lines)
-                    for i in range(len(fixed_lines) - 1, -1, -1):
-                        line = fixed_lines[i].strip()
-                        if line and not line.startswith('#'):
-                            yaml_end = i + 1
-                            break
-                    
-                    yaml_block = '\n'.join(fixed_lines[yaml_start:yaml_end])
-                    parsed = yaml.safe_load(yaml_block)
-                except yaml.YAMLError as e3:
-                    last_error = e3
-                    
-                    # Strategy 4: Fix nested list indentation issues
-                    # Llama often creates lists with wrong indentation
-                    try:
-                        ultra_fixed_lines = []
-                        prev_indent = 0
-                        in_list = False
-                        
-                        for line in fixed_lines[yaml_start:yaml_end]:
-                            stripped = line.lstrip()
-                            if not stripped:
-                                ultra_fixed_lines.append(line)
-                                continue
-                            
-                            current_indent = len(line) - len(stripped)
-                            
-                            # If this is a list item
-                            if stripped.startswith('- '):
-                                if in_list and current_indent <= prev_indent:
-                                    # Same level or outdented list item - keep as is
-                                    ultra_fixed_lines.append(line)
-                                elif in_list and current_indent > prev_indent + 2:
-                                    # Over-indented list item - fix it
-                                    ultra_fixed_lines.append(' ' * (prev_indent + 2) + stripped)
-                                else:
-                                    ultra_fixed_lines.append(line)
-                                in_list = True
-                                prev_indent = len(ultra_fixed_lines[-1]) - len(ultra_fixed_lines[-1].lstrip())
-                            # If this is a key: value line
-                            elif ':' in stripped and not stripped.startswith('#'):
-                                in_list = False
-                                ultra_fixed_lines.append(line)
-                                prev_indent = current_indent
-                            else:
-                                # Regular content line
-                                ultra_fixed_lines.append(line)
-                        
-                        yaml_block = '\n'.join(ultra_fixed_lines)
-                        parsed = yaml.safe_load(yaml_block)
-                    except yaml.YAMLError as e4:
-                        last_error = e4
-        
-        if parsed is None:
-            raise ValidationError(f"Invalid YAML output after all cleanup attempts: {last_error}")
+                # Fix trailing commas (common LLM mistake)
+                fixed_output = re.sub(r',(\s*[}\]])', r'\1', cleaned_output)
+                # Fix single quotes (should be double quotes)
+                fixed_output = fixed_output.replace("'", '"')
+                parsed = json.loads(fixed_output)
+            except json.JSONDecodeError as e2:
+                raise ValidationError(f"Invalid JSON output: {e2}\n\nOutput was:\n{cleaned_output[:500]}")
         
         if not isinstance(parsed, dict):
-            raise ValidationError("Output must be a YAML dictionary")
+            raise ValidationError("Output must be a JSON object (dictionary)")
         
         # Check if base fields are nested in a top-level key
         if len(parsed) == 1 and "agent" not in parsed:

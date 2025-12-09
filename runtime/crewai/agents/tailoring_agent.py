@@ -19,7 +19,7 @@ class TailoringAgent(BaseHydraAgent):
     
     role = "Tailoring Agent"
     goal = "Generate tailored, human-sounding resumes and cover letters using verified source material"
-    expected_output = "YAML with tailored resume, cover letter, and source traceability"
+    expected_output = "JSON with tailored resume, cover letter, and source traceability"
     
     def __init__(self, llm: LLM):
         """

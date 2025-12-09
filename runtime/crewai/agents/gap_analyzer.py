@@ -19,7 +19,7 @@ class GapAnalyzerAgent(BaseHydraAgent):
     
     role = "Gap Analyzer"
     goal = "Map job requirements to candidate experience and classify fit levels"
-    expected_output = "YAML with requirements analysis, classifications, and fit scoring"
+    expected_output = "JSON with requirements analysis, classifications, and fit scoring"
     
     def __init__(self, llm: LLM):
         """
