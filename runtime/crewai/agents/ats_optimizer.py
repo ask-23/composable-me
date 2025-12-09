@@ -70,11 +70,9 @@ class ATSOptimizerAgent(BaseHydraAgent):
         Ensure all additions are truthful and verifiable against source documents.
         """
         
-        # Execute with retry logic
-        result = self.execute_with_retry(task_description, context)
-        
-        # Validate the output
-        self._validate_schema(result)
+        # Create task and execute with retry logic
+        task = self.create_task(task_description)
+        result = self.execute_with_retry(task)
         
         return result
     

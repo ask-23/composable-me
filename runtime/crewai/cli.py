@@ -37,7 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--model",
-        help="Override model name (defaults to OPENROUTER_MODEL or anthropic/claude-3.5-sonnet)",
+        help="Override model name (defaults to OPENROUTER_MODEL or anthropic/claude-sonnet-4.5)",
     )
     parser.add_argument(
         "--max-audit-retries",

@@ -20,8 +20,8 @@ from runtime.crewai.llm_client import get_llm_client, LLMClientError
 
 
 requires_api_key = pytest.mark.skipif(
-    not os.environ.get("OPENROUTER_API_KEY"),
-    reason="OPENROUTER_API_KEY not set for live integration tests",
+    not (os.environ.get("OPENROUTER_API_KEY") or os.environ.get("TOGETHER_API_KEY") or os.environ.get("CHUTES_API_KEY")),
+    reason="API key not set (OPENROUTER_API_KEY, TOGETHER_API_KEY, or CHUTES_API_KEY required)",
 )
 
 

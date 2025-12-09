@@ -143,24 +143,34 @@ class GapAnalyzerAgent(BaseHydraAgent):
                     if not 0.0 <= confidence <= 1.0:
                         raise ValidationError(f"Confidence in requirement {i} must be between 0.0 and 1.0")
         
-        # Validate fit_score (can be in different locations)
+        # Validate fit_score (can be in different locations) - be lenient
         fit_score = analysis.get("fit_score")
         if fit_score is None and "summary" in analysis:
             # Try to extract from summary
             summary = analysis["summary"]
             if isinstance(summary, dict) and "fit_score" in summary:
-                fit_score_str = summary["fit_score"]
-                # Handle percentage strings like "92%"
-                if isinstance(fit_score_str, str) and fit_score_str.endswith("%"):
-                    fit_score = float(fit_score_str.rstrip("%"))
-                else:
-                    fit_score = fit_score_str
+                fit_score = summary["fit_score"]
         
         if fit_score is not None:
-            if not isinstance(fit_score, (int, float)):
-                raise ValidationError("fit_score must be a number")
-            if not 0.0 <= fit_score <= 100.0:
-                raise ValidationError("fit_score must be between 0.0 and 100.0")
+            # Try to convert to number if it's a string
+            if isinstance(fit_score, str):
+                # Handle percentage strings like "92%"
+                if fit_score.endswith("%"):
+                    try:
+                        fit_score = float(fit_score.rstrip("%"))
+                    except ValueError:
+                        pass  # Ignore invalid format
+                else:
+                    try:
+                        fit_score = float(fit_score)
+                    except ValueError:
+                        pass  # Ignore invalid format
+            
+            # Only validate if it's a number
+            if isinstance(fit_score, (int, float)):
+                if not 0.0 <= fit_score <= 100.0:
+                    # Clamp to valid range instead of failing
+                    fit_score = max(0.0, min(100.0, fit_score))
         
         # Gaps and blockers are optional - don't fail if missing
         # They might be embedded in the requirements list

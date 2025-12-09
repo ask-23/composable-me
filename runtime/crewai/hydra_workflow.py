@@ -102,7 +102,7 @@ class HydraWorkflow:
             # Execute pipeline stages
             gap_result = self._execute_gap_analysis(context)
             interrogation_result = self._execute_interrogation(context, gap_result)
-            differentiation_result = self._execute_differentiation(context, gap_result)
+            differentiation_result = self._execute_differentiation(context, gap_result, interrogation_result)
             tailoring_result = self._execute_tailoring(context, gap_result, interrogation_result, differentiation_result)
             ats_result = self._execute_ats_optimization(context, tailoring_result)
             
@@ -177,12 +177,16 @@ class HydraWorkflow:
         self.intermediate_results["interrogation"] = result
         return result
 
-    def _execute_differentiation(self, context: Dict[str, Any], gap_result: Dict[str, Any]) -> Dict[str, Any]:
+    def _execute_differentiation(self, context: Dict[str, Any], gap_result: Dict[str, Any], interrogation_result: Dict[str, Any]) -> Dict[str, Any]:
         """Execute differentiation stage"""
         self.current_state = WorkflowState.DIFFERENTIATION
         self._log("Executing Differentiation")
 
-        differentiation_context = {**context, "gap_analysis": gap_result}
+        differentiation_context = {
+            **context,
+            "gap_analysis": gap_result,
+            "interview_notes": interrogation_result.get("interview_notes", "")  # Provide empty string if missing
+        }
         result = self.differentiator.execute(differentiation_context)
         self.intermediate_results["differentiation"] = result
         return result
@@ -192,12 +196,15 @@ class HydraWorkflow:
         """Execute tailoring stage"""
         self.current_state = WorkflowState.TAILORING
         self._log("Executing Tailoring")
-
+        
+        # Add all required context
         tailoring_context = {
             **context,
             "gap_analysis": gap_result,
+            "interview_notes": interrogation_result.get("interview_notes", ""),
             "interrogation_prep": interrogation_result,
-            "differentiation": differentiation_result
+            "differentiation": differentiation_result,
+            "differentiators": differentiation_result.get("differentiators", [])
         }
         result = self.tailoring_agent.execute(tailoring_context)
         self.intermediate_results["tailoring"] = result
@@ -211,7 +218,8 @@ class HydraWorkflow:
         ats_context = {
             **context,
             "tailored_resume": tailoring_result.get("tailored_resume", ""),
-            "tailored_cover_letter": tailoring_result.get("tailored_cover_letter", "")
+            "tailored_cover_letter": tailoring_result.get("tailored_cover_letter", ""),
+            "differentiators": self.intermediate_results.get("differentiation", {}).get("differentiators", [])
         }
         result = self.ats_optimizer.execute(ats_context)
         self.intermediate_results["ats_optimization"] = result
@@ -248,11 +256,21 @@ class HydraWorkflow:
                     }
                     cover_letter_audit = self.auditor_suite.execute(cover_letter_audit_context)
 
-                # Check if audit passed
-                resume_approved = resume_audit.get("approval", {}).get("approved", False)
+                # Check if audit passed - handle both nested and flat structures
+                # Try nested first (audit_report.approval.approved)
+                resume_approved = False
+                if "audit_report" in resume_audit:
+                    resume_approved = resume_audit["audit_report"].get("approval", {}).get("approved", False)
+                else:
+                    # Try flat structure (approval.approved)
+                    resume_approved = resume_audit.get("approval", {}).get("approved", False)
+                
                 cover_letter_approved = True  # Default to true if no cover letter
                 if cover_letter_audit:
-                    cover_letter_approved = cover_letter_audit.get("approval", {}).get("approved", False)
+                    if "audit_report" in cover_letter_audit:
+                        cover_letter_approved = cover_letter_audit["audit_report"].get("approval", {}).get("approved", False)
+                    else:
+                        cover_letter_approved = cover_letter_audit.get("approval", {}).get("approved", False)
 
                 if resume_approved and cover_letter_approved:
                     self._log(f"Audit passed on attempt {retry_count + 1}")

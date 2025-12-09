@@ -15,7 +15,7 @@ class HydraConfig:
     
     # LLM Configuration
     openrouter_api_key: str
-    openrouter_model: str = "anthropic/claude-3.5-sonnet"
+    openrouter_model: str = "anthropic/claude-sonnet-4.5"
     
     # Workflow Configuration
     enable_research_agent: bool = True
@@ -46,7 +46,7 @@ class HydraConfig:
             openrouter_api_key=api_key,
             openrouter_model=os.environ.get(
                 "OPENROUTER_MODEL", 
-                "anthropic/claude-3.5-sonnet"
+                "anthropic/claude-sonnet-4.5"
             ),
             enable_research_agent=os.environ.get(
                 "ENABLE_RESEARCH", "true"

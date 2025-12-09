@@ -22,11 +22,15 @@ def get_llm_client(
     timeout: int = 60
 ) -> LLM:
     """
-    Configure and return LLM client for CrewAI using OpenRouter.
+    Configure and return LLM client for CrewAI.
+    
+    Supports multiple providers:
+    - Chutes.ai (CHUTES_API_KEY) - OpenAI-compatible gateway
+    - OpenRouter (OPENROUTER_API_KEY) - Multi-model router
     
     Args:
-        api_key: OpenRouter API key (defaults to OPENROUTER_API_KEY env var)
-        model: Model to use (defaults to OPENROUTER_MODEL env var or claude-3.5-sonnet)
+        api_key: API key (checks CHUTES_API_KEY, then OPENROUTER_API_KEY)
+        model: Model to use (defaults to env var or claude-sonnet-4.5)
         max_retries: Maximum number of retries for API failures
         timeout: Request timeout in seconds
         
@@ -36,43 +40,76 @@ def get_llm_client(
     Raises:
         LLMClientError: If API key is missing or configuration fails
     """
-    # Get API key from parameter or environment
-    api_key = api_key or os.environ.get("OPENROUTER_API_KEY")
+    # Check for Together AI first (preferred)
+    together_key = api_key or os.environ.get("TOGETHER_API_KEY")
+    chutes_key = os.environ.get("CHUTES_API_KEY")
+    openrouter_key = os.environ.get("OPENROUTER_API_KEY")
     
-    if not api_key:
+    if together_key:
+        # Use Together AI (via LiteLLM)
+        model = model or os.environ.get("TOGETHER_MODEL") or os.environ.get("OPENROUTER_MODEL", "meta-llama/Llama-3.3-70B-Instruct-Turbo")
+        
+        try:
+            # LiteLLM requires together_ai/ prefix for Together AI models
+            llm = LLM(
+                model=f"together_ai/{model}",
+                api_key=together_key,
+                timeout=timeout,
+                max_retries=max_retries,
+            )
+            return llm
+        except Exception as e:
+            raise LLMClientError(f"Failed to initialize Together AI LLM client: {e}")
+    
+    elif chutes_key:
+        # Use Chutes.ai (OpenAI-compatible)
+        model = model or os.environ.get("CHUTES_MODEL") or os.environ.get("OPENROUTER_MODEL", "deepseek-ai/DeepSeek-V3.1")
+        
+        try:
+            # Chutes uses OpenAI-compatible API - prefix with openai/ for LiteLLM
+            llm = LLM(
+                model=f"openai/{model}",  # LiteLLM needs provider prefix
+                api_key=chutes_key,
+                base_url="https://api.chutes.ai/v1",
+                timeout=timeout,
+                max_retries=max_retries,
+            )
+            return llm
+        except Exception as e:
+            raise LLMClientError(f"Failed to initialize Chutes LLM client: {e}")
+    
+    elif openrouter_key:
+        # Use OpenRouter
+        if not openrouter_key.startswith("sk-or-"):
+            raise LLMClientError(
+                "Invalid OpenRouter API key format. "
+                "Key should start with 'sk-or-'"
+            )
+        
+        model = model or os.environ.get("OPENROUTER_MODEL", "anthropic/claude-sonnet-4.5")
+        
+        try:
+            llm = LLM(
+                model=f"openrouter/{model}",
+                api_key=openrouter_key,
+                base_url="https://openrouter.ai/api/v1",
+                timeout=timeout,
+                max_retries=max_retries,
+            )
+            return llm
+        except Exception as e:
+            raise LLMClientError(f"Failed to initialize OpenRouter LLM client: {e}")
+    
+    else:
         raise LLMClientError(
-            "OpenRouter API key is required. Set it via:\n"
+            "API key is required. Set one of:\n"
+            "  export TOGETHER_API_KEY='tgp_v1_...'  (recommended)\n"
+            "  export CHUTES_API_KEY='your-key'\n"
             "  export OPENROUTER_API_KEY='sk-or-...'\n"
-            "Get your key from: https://openrouter.ai/keys"
+            "Get Together AI key from: https://api.together.xyz/settings/api-keys\n"
+            "Get Chutes key from: https://chutes.ai\n"
+            "Get OpenRouter key from: https://openrouter.ai/keys"
         )
-    
-    # Validate API key format
-    if not api_key.startswith("sk-or-"):
-        raise LLMClientError(
-            "Invalid OpenRouter API key format. "
-            "Key should start with 'sk-or-'"
-        )
-    
-    # Get model from parameter or environment with fallback
-    model = model or os.environ.get(
-        "OPENROUTER_MODEL",
-        "anthropic/claude-3.5-sonnet"
-    )
-    
-    try:
-        # Create LLM instance with OpenRouter configuration
-        llm = LLM(
-            model=f"openrouter/{model}",
-            api_key=api_key,
-            base_url="https://openrouter.ai/api/v1",
-            timeout=timeout,
-            max_retries=max_retries,
-        )
-        
-        return llm
-        
-    except Exception as e:
-        raise LLMClientError(f"Failed to initialize LLM client: {e}")
 
 
 def test_llm_connection(llm: LLM) -> bool:
@@ -121,11 +158,13 @@ def get_available_models() -> list[str]:
         List of model identifiers
     """
     return [
-        "anthropic/claude-3.5-sonnet",  # Default, recommended
-        "anthropic/claude-sonnet-4-20250514",  # Latest Sonnet 4
+        "anthropic/claude-sonnet-4.5",  # Default, latest and best
+        "anthropic/claude-sonnet-4",  # Sonnet 4
+        "anthropic/claude-3.7-sonnet",  # Claude 3.7 Sonnet
+        "anthropic/claude-3.5-sonnet",  # Claude 3.5 Sonnet
         "anthropic/claude-3-opus",  # Highest quality, slower
-        "openai/gpt-4-turbo",  # Alternative provider
         "openai/gpt-4o",  # Latest GPT-4
+        "openai/gpt-4-turbo",  # Alternative provider
     ]
 
 
