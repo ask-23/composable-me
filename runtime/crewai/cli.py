@@ -70,9 +70,14 @@ def _read_sources(directory: Path) -> str:
     parts: list[str] = []
     for path in sorted(directory.iterdir()):
         if path.is_file():
-            parts.append(f"# {path.name}\n{path.read_text()}\n")
+            try:
+                content = path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                print(f"Skipping non-text source file (unable to decode UTF-8): {path.name}")
+                continue
+            parts.append(f"# {path.name}\n{content}\n")
     if not parts:
-        raise ValueError(f"No source documents found in {directory}")
+        raise ValueError(f"No UTF-8 text source documents found in {directory}")
     return "\n".join(parts)
 
 
