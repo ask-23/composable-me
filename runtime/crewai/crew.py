@@ -9,7 +9,7 @@ Usage:
 
 Environment:
     OPENROUTER_API_KEY: Your OpenRouter API key
-    OPENROUTER_MODEL: Model to use (default: anthropic/claude-3.5-sonnet)
+    OPENROUTER_MODEL: Model to use (default: anthropic/claude-sonnet-4.5)
 """
 
 import os
@@ -54,7 +54,7 @@ def get_llm() -> LLM:
             "  export OPENROUTER_API_KEY='sk-or-...'"
         )
 
-    model = os.environ.get("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
+    model = os.environ.get("OPENROUTER_MODEL", "anthropic/claude-sonnet-4.5")
 
     return LLM(
         model=f"openrouter/{model}",
