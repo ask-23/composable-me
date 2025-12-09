@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Composable Crew Report Viewer</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --text-color: #2c3e50;
+            --card-bg: #ffffff;
+            --border-color: #e9ecef;
+            --primary-color: #3498db;
+            --success-color: #2ecc71;
+            --warning-color: #f1c40f;
+            --danger-color: #e74c3c;
+            --header-bg: #2c3e50;
+            --header-text: #ecf0f1;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        .header {
+            background-color: var(--header-bg);
+            color: var(--header-text);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 500;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        /* Drop Zone */
+        #drop-zone {
+            border: 2px dashed #cbd5e0;
+            border-radius: 8px;
+            padding: 3rem;
+            text-align: center;
+            background-color: var(--card-bg);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin-bottom: 2rem;
+        }
+
+        #drop-zone:hover {
+            border-color: var(--primary-color);
+            background-color: #f8fbff;
+        }
+
+        #drop-zone.dragover {
+            border-color: var(--primary-color);
+            background-color: #ebf5ff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: #a0aec0;
+            margin-bottom: 1rem;
+        }
+
+        /* Report Cards */
+        .report-card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 2rem;
+            overflow: hidden;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #fff;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-color);
+            margin: 0;
+        }
+
+        .card-meta {
+            font-size: 0.875rem;
+            color: #718096;
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        /* Status Badges */
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-success { background-color: #def7ec; color: #03543f; }
+        .badge-warning { background-color: #fefcbf; color: #744210; }
+        .badge-danger { background-color: #fed7d7; color: #742a2a; }
+        .badge-info { background-color: #ebf8ff; color: #2c5282; }
+
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-item {
+            background-color: #f7fafc;
+            padding: 1rem;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            display: block;
+        }
+
+        .metric-label {
+            font-size: 0.875rem;
+            color: #718096;
+            margin-top: 0.25rem;
+            display: block;
+        }
+
+        /* Tables */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .data-table th, .data-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-table th {
+            background-color: #f8fafc;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Document Preview */
+        .document-preview {
+            background-color: #fff;
+            border: 1px solid var(--border-color);
+            padding: 2rem;
+            border-radius: 4px;
+            font-family: "Georgia", serif;
+            line-height: 1.8;
+            color: #2d3748;
+            white-space: pre-wrap;
+        }
+
+        /* Raw JSON Fallback */
+        .raw-json {
+            background-color: #2d3748;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: monospace;
+            font-size: 0.875rem;
+        }
+
+        /* Utility */
+        .hidden { display: none; }
+        .mt-4 { margin-top: 1rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #4a5568;
+            border-left: 4px solid var(--primary-color);
+            padding-left: 0.75rem;
+        }
+
+        .evidence-box {
+            background-color: #f7fafc;
+            border-left: 3px solid #cbd5e0;
+            padding: 0.75rem;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            color: #4a5568;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Composable Crew Report Viewer</h1>
+    </div>
+
+    <div class="container">
+        <div id="drop-zone">
+            <div class="upload-icon">📄</div>
+            <h3>Drop Agent Output Here</h3>
+            <p style="color: #718096;">Drag & drop a JSON file or click to browse</p>
+            <input type="file" id="file-input" accept=".json" style="display: none;">
+        </div>
+
+        <div id="report-container"></div>
+    </div>
+
+    <script>
+        // --- Core Logic ---
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const reportContainer = document.getElementById('report-container');
+
+        // Event Listeners
+        dropZone.addEventListener('click', () => fileInput.click());
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length) handleFile(files[0]);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (fileInput.files.length) handleFile(fileInput.files[0]);
+        });
+
+        function handleFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    renderReport(data);
+                } catch (err) {
+                    alert('Invalid JSON file');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // --- Rendering Logic ---
+
+        function renderReport(data) {
+            reportContainer.innerHTML = ''; // Clear previous
+
+            // Detect Agent Type
+            const agentType = detectAgentType(data);
+            
+            // Create Wrapper Card
+            const card = document.createElement('div');
+            card.className = 'report-card';
+
+            // Render Header
+            const header = document.createElement('div');
+            header.className = 'card-header';
+            header.innerHTML = `
+                <div>
+                    <h2 class="card-title">${data.agent || 'Unknown Agent'} Report</h2>
+                    <span class="card-meta">Generated: ${formatDate(data.timestamp)}</span>
+                </div>
+                <span class="badge badge-info">Confidence: ${(data.confidence * 100).toFixed(0)}%</span>
+            `;
+            card.appendChild(header);
+
+            // Render Body based on Agent Type
+            const body = document.createElement('div');
+            body.className = 'card-body';
+
+            switch(agentType) {
+                case 'gap_analyzer':
+                    renderGapAnalysis(data, body);
+                    break;
+                case 'tailoring_agent':
+                    renderTailoring(data, body);
+                    break;
+                case 'auditor':
+                    renderAudit(data, body);
+                    break;
+                default:
+                    renderGeneric(data, body);
+            }
+
+            card.appendChild(body);
+            reportContainer.appendChild(card);
+        }
+
+        function detectAgentType(data) {
+            if (data.gap_analysis) return 'gap_analyzer';
+            if (data.tailored_output) return 'tailoring_agent';
+            if (data.audit_report) return 'auditor';
+            return 'unknown';
+        }
+
+        // --- Specific Renderers ---
+
+        function renderGapAnalysis(data, container) {
+            const analysis = data.gap_analysis;
+            const summary = analysis.summary;
+
+            // Metrics
+            container.innerHTML += `
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                        <span class="metric-value">${summary.fit_score}%</span>
+                        <span class="metric-label">Fit Score</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-value">${summary.recommendation}</span>
+                        <span class="metric-label">Recommendation</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-value" style="color: ${summary.blockers > 0 ? 'var(--danger-color)' : 'var(--success-color)'}">${summary.blockers}</span>
+                        <span class="metric-label">Blockers</span>
+                    </div>
+                </div>
+            `;
+
+            // Requirements Table
+            container.innerHTML += `<h3 class="section-title">Requirements Analysis</h3>`;
+            
+            const table = document.createElement('table');
+            table.className = 'data-table';
+            table.innerHTML = `
+                <thead>
+                    <tr>
+                        <th>Requirement</th>
+                        <th>Type</th>
+                        <th>Match Status</th>
+                        <th>Evidence</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${analysis.requirements.map(req => `
+                        <tr>
+                            <td style="width: 30%">${req.text}</td>
+                            <td><span class="badge badge-info">${req.type.replace('_', ' ')}</span></td>
+                            <td>${getStatusBadge(req.classification)}</td>
+                            <td style="font-size: 0.9rem; color: #4a5568;">${req.evidence || '-'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            `;
+            container.appendChild(table);
+
+            // Gaps Section (if any)
+            if (analysis.gaps && analysis.gaps.length > 0) {
+                container.innerHTML += `<h3 class="section-title mt-4">Identified Gaps</h3>`;
+                const gapList = document.createElement('ul');
+                analysis.gaps.forEach(gap => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<strong>${gap.text}</strong> - ${gap.framing || 'No framing provided'}`;
+                    gapList.appendChild(li);
+                });
+                container.appendChild(gapList);
+            }
+        }
+
+        function renderTailoring(data, container) {
+            const output = data.tailored_output;
+            
+            // Meta Info
+            container.innerHTML += `
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                        <span class="metric-value">${output.meta.role}</span>
+                        <span class="metric-label">Target Role</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-value">${output.meta.company}</span>
+                        <span class="metric-label">Company</span>
+                    </div>
+                </div>
+            `;
+
+            // Resume Preview
+            if (output.resume) {
+                container.innerHTML += `<h3 class="section-title">Tailored Resume</h3>`;
+                
+                // Notes
+                if (output.resume.notes && output.resume.notes.length > 0) {
+                    container.innerHTML += `
+                        <div class="evidence-box mb-4">
+                            <strong>Strategy Notes:</strong>
+                            <ul style="margin: 0.5rem 0 0 1rem; padding: 0;">
+                                ${output.resume.notes.map(n => `<li>${n}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                }
+
+                // Content
+                container.innerHTML += `
+                    <div class="document-preview">
+                        ${output.resume.content || output.resume_preview || 'No content available'}
+                    </div>
+                `;
+            }
+        }
+
+        function renderAudit(data, container) {
+            const report = data.audit_report;
+            const summary = report.summary;
+
+            // Summary Metrics
+            container.innerHTML += `
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                        <span class="metric-value">${summary.overall_status}</span>
+                        <span class="metric-label">Overall Status</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-value" style="color: ${summary.blocking_issues > 0 ? 'var(--danger-color)' : 'var(--success-color)'}">${summary.blocking_issues}</span>
+                        <span class="metric-label">Blocking Issues</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-value">${summary.warnings}</span>
+                        <span class="metric-label">Warnings</span>
+                    </div>
+                </div>
+            `;
+
+            // Detailed Audits
+            const audits = ['truth_audit', 'tone_audit', 'ats_audit', 'compliance_audit'];
+            
+            audits.forEach(auditKey => {
+                if (report[auditKey]) {
+                    const audit = report[auditKey];
+                    const title = auditKey.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    
+                    container.innerHTML += `
+                        <div class="mb-4">
+                            <h3 class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+                                ${title}
+                                ${getStatusBadge(audit.status)}
+                            </h3>
+                            ${renderAuditIssues(audit.issues)}
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        function renderGeneric(data, container) {
+            container.innerHTML += `
+                <div class="raw-json">
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                </div>
+            `;
+        }
+
+        // --- Helpers ---
+
+        function renderAuditIssues(issues) {
+            if (!issues || issues.length === 0) {
+                return '<p style="color: var(--success-color); font-style: italic;">No issues found.</p>';
+            }
+
+            return `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Severity</th>
+                            <th>Issue</th>
+                            <th>Fix</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${issues.map(issue => `
+                            <tr>
+                                <td>${getSeverityBadge(issue.severity)}</td>
+                                <td>${issue.pattern || issue.description || 'Issue detected'}</td>
+                                <td>${issue.fix || '-'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function getStatusBadge(status) {
+            const s = status.toLowerCase();
+            if (s === 'direct_match' || s === 'pass' || s === 'approved') 
+                return `<span class="badge badge-success">${status}</span>`;
+            if (s === 'adjacent' || s === 'conditional' || s === 'warning') 
+                return `<span class="badge badge-warning">${status}</span>`;
+            if (s === 'gap' || s === 'blocker' || s === 'fail') 
+                return `<span class="badge badge-danger">${status}</span>`;
+            return `<span class="badge badge-info">${status}</span>`;
+        }
+
+        function getSeverityBadge(severity) {
+            const s = severity.toLowerCase();
+            if (s === 'blocking' || s === 'high') return `<span class="badge badge-danger">${severity}</span>`;
+            if (s === 'warning' || s === 'medium') return `<span class="badge badge-warning">${severity}</span>`;
+            return `<span class="badge badge-info">${severity}</span>`;
+        }
+
+        function formatDate(isoString) {
+            if (!isoString) return 'Unknown Date';
+            return new Date(isoString).toLocaleString();
+        }
+
+    </script>
+</body>
+</html>
