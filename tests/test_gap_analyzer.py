@@ -6,7 +6,7 @@ evidence tracking, and truth law compliance.
 """
 
 import pytest
-import yaml
+import json
 from unittest.mock import Mock, patch, MagicMock
 from crewai import LLM
 
@@ -20,7 +20,10 @@ class TestGapAnalyzerAgent:
     @pytest.fixture
     def mock_llm(self):
         """Create a mock LLM for testing"""
-        return Mock(spec=LLM)
+        from crewai import LLM
+        # Create a real LLM instance with minimal config for testing
+        # This avoids validation errors when creating agents
+        return LLM(model="gpt-4", api_key="test-key")
     
     @pytest.fixture
     def gap_analyzer(self, mock_llm):
@@ -84,7 +87,7 @@ class TestGapAnalyzerAgent:
             agent = GapAnalyzerAgent(mock_llm)
             assert agent.role == "Gap Analyzer"
             assert agent.goal == "Map job requirements to candidate experience and classify fit levels"
-            assert "YAML" in agent.expected_output
+            assert "JSON" in agent.expected_output
     
     def test_execute_missing_job_description(self, gap_analyzer):
         """Test execute with missing job description"""

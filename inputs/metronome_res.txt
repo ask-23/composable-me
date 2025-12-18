@@ -1,0 +1,107 @@
+Alex Korshak
+
+Head of Infrastructure / Platform Engineering Leader
+Dallas–Fort Worth, TX • Open to Remote
+linkedin.com/in/alexkorshak
+
+SUMMARY
+
+Hands-on infrastructure and platform engineering leader with deep experience designing, scaling, and operating cloud platforms that support high-growth SaaS products. Proven track record modernizing infrastructure, CI/CD, and GitOps practices; improving reliability and operational readiness; and building internal platforms that remove friction for engineering teams without sacrificing safety or control. Strong fit for environments with complex billing, high availability expectations, and engineering-driven cultures.
+
+CORE EXPERTISE
+
+Infrastructure Engineering • Platform Engineering • Cloud Architecture (AWS)
+DevOps & SRE • CI/CD & GitOps • Infrastructure as Code (Terraform)
+Kubernetes & Containers • Observability & Operational Readiness
+Security & Compliance (SOC 2) • Developer Enablement • Reliability at Scale
+
+PROFESSIONAL EXPERIENCE
+Limecord — Platform & Engineering Consulting (Client Work)
+
+Principal / Platform Engineering Lead
+June 2023 – Present
+
+Led hands-on platform engineering and infrastructure modernization engagements across multiple organizations, balancing technical leadership with direct delivery.
+
+Designed and implemented cloud foundations including AWS landing zones, IAM patterns, networking baselines, CI/CD pipelines, and observability standards.
+
+Introduced GitOps-based workflows to replace ad-hoc infrastructure changes with reviewable, auditable, and repeatable delivery processes.
+
+Built internal platforms and paved paths that removed infrastructure complexity from application teams while preserving operational and security guarantees.
+
+Embedded security controls and SOC 2-aligned evidence capture directly into pipelines and platform guardrails, reducing audit friction and operational drag.
+
+AFG Technologies — Client Engagement via Limecord
+
+Platform / DevOps / Engineering Leadership
+June 2025 – Present
+
+Drove infrastructure and delivery improvements across multiple engineering teams by standardizing build, deploy, and operational patterns.
+
+Replaced manual infrastructure practices with GitOps-driven workflows, improving reliability and reducing configuration drift.
+
+Served as AWS subject-matter expert across IAM, CI/CD, containers, Kubernetes, and resilience patterns.
+
+Improved developer velocity by establishing clear platform conventions, templates, and guardrails that enabled autonomy while protecting production systems.
+
+Agora Data
+
+Vice President of Engineering / Platform Leadership
+January 2022 – June 2023
+
+Owned infrastructure, platform, and reliability strategy during a period of rapid organizational and product scale.
+
+Modernized cloud infrastructure and deployment practices to improve stability, performance, and delivery speed while maintaining security expectations.
+
+Partnered closely with product, engineering, and security stakeholders to align infrastructure priorities with business outcomes.
+
+Supported production systems with high availability expectations, applying SRE principles and operational readiness practices.
+
+Note: Role intentionally overlapped with prior consulting engagement during transition.
+
+Supreme Golf
+
+Director of Software Engineering
+January 2019 – December 2022
+
+Introduced and established platform engineering as a formal function within the organization.
+
+Built and led the platform team responsible for infrastructure, CI/CD, observability, and shared services.
+
+Improved deployment safety and operational maturity through standardization of delivery pipelines and ownership boundaries.
+
+Enabled developer independence by reducing infrastructure friction and defining clear paved paths for common workflows.
+
+T-Mobile
+
+Senior Manager, Production & Technology
+2016 – 2018
+
+Led teams responsible for production systems and platform-adjacent infrastructure with strict availability and reliability requirements.
+
+Worked across engineering and operations to improve delivery practices, incident readiness, and operational consistency at scale.
+
+OPEN SOURCE & COMMUNITY
+
+Prowler (Cloud security and compliance tooling) — Contributor
+Applied open-source security and compliance practices to enterprise cloud environments.
+
+EDUCATION & CERTIFICATIONS
+
+B.Sc. Computer Science — University College London (UCL)
+
+AWS Certifications
+
+AWS Certified DevOps Engineer – Professional
+
+AWS Certified Developer – Associate
+
+AWS Certified Solutions Architect – Associate
+
+Scrum Alliance
+
+Certified Agile Leader (CAL-E / CAL-T / CAL-O)
+
+AWS Training & Certification
+
+Subject Matter Expert — AWS Developer & DevOps Engineer Professional programs

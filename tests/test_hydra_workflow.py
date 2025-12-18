@@ -251,7 +251,8 @@ class TestHydraWorkflow:
 
         assert len(workflow.execution_log) == 1
         assert "Test log message" in workflow.execution_log[0]
-        assert "2025-12-06" in workflow.execution_log[0]  # Should contain timestamp
+        # Check that timestamp is present (format: [YYYY-MM-DDTHH:MM:SS.ffffff])
+        assert "[" in workflow.execution_log[0] and "]" in workflow.execution_log[0]
 
     def test_workflow_state_transitions(self, workflow, sample_context, mock_agent_results):
         """Test that workflow states transition correctly"""

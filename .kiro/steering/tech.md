@@ -3,17 +3,17 @@
 ## Primary Implementation
 
 **Runtime:** Python 3.x with CrewAI framework
-**LLM Provider:** OpenRouter (supports multiple models)
-**Default Model:** `anthropic/claude-3.5-sonnet`
+**LLM Providers:** Together AI (recommended), OpenRouter, Chutes.ai
+**Default Model:** `meta-llama/Llama-3.3-70B-Instruct-Turbo` (Together AI)
 
 ## Dependencies
 
 Core libraries (see `requirements.txt`):
 - `crewai>=0.86.0` - Multi-agent orchestration framework
 - `crewai-tools>=0.17.0` - Agent tooling
+- `litellm>=1.0.0` - Multi-provider LLM client
 - `openai>=1.0.0` - API compatibility layer
 - `langchain>=0.3.0` - LLM abstractions
-- `pyyaml>=6.0` - Structured data handling
 - `python-dotenv>=1.0.0` - Environment configuration
 - `rich>=13.0.0` - Console output formatting
 
@@ -24,14 +24,24 @@ Core libraries (see `requirements.txt`):
 
 ## Environment Configuration
 
-Required:
+**Choose one provider:**
+
+Together AI (recommended):
 ```bash
-export OPENROUTER_API_KEY='sk-or-...'  # Get from openrouter.ai/keys
+export TOGETHER_API_KEY='tgp_v1_...'  # Get from together.ai
+export TOGETHER_MODEL='meta-llama/Llama-3.3-70B-Instruct-Turbo'  # Optional override
 ```
 
-Optional:
+OpenRouter (alternative):
 ```bash
-export OPENROUTER_MODEL='anthropic/claude-3-5-sonnet'  # Override default model
+export OPENROUTER_API_KEY='sk-or-...'  # Get from openrouter.ai/keys
+export OPENROUTER_MODEL='anthropic/claude-sonnet-4.5'  # Optional override
+```
+
+Chutes.ai (alternative):
+```bash
+export CHUTES_API_KEY='your-key'  # Get from chutes.ai
+export CHUTES_MODEL='deepseek-ai/DeepSeek-V3.1'  # Optional override
 ```
 
 ## Common Commands
@@ -48,17 +58,24 @@ pip install -r requirements.txt
 
 ### Running the System
 
-Quick run with sample files:
+Full CLI (recommended):
 ```bash
-./run.sh examples/sample_jd.md examples/sample_resume.md
+./run.sh --jd path/to/job.md \
+         --resume path/to/resume.md \
+         --sources sources/ \
+         --out output/
 ```
 
-With interview notes:
+Direct CLI execution:
 ```bash
-./run.sh path/to/jd.md path/to/resume.md path/to/notes.md
+python -m runtime.crewai.cli \
+    --jd examples/sample_jd.md \
+    --resume examples/sample_resume.md \
+    --sources examples/ \
+    --out output/
 ```
 
-Direct Python execution:
+Quick runner (simplified):
 ```bash
 python runtime/crewai/quick_crew.py \
     --jd examples/sample_jd.md \
@@ -81,9 +98,9 @@ pip install -r requirements.txt --upgrade
 ## Architecture Patterns
 
 ### Agent Communication
-- Agents communicate via structured YAML, not prose
+- Agents communicate via structured JSON, not prose
 - Each agent has single responsibility (no generation + verification in same agent)
-- Commander orchestrates workflow and enforces truth constraints
+- Workflow orchestrator coordinates agents and enforces truth constraints
 
 ### State Management
 - Workflow state maintained across agent executions
@@ -126,8 +143,13 @@ output/                   # Generated applications
 
 ## Model Recommendations
 
-Works well with:
-- `anthropic/claude-3.5-sonnet` (default, recommended - fast and high quality)
-- `anthropic/claude-sonnet-4.5` (latest, most advanced if available)
-- `anthropic/claude-3-opus` (slower, highest quality)
-- `openai/gpt-4-turbo` (alternative provider)
+**Recommended (Together AI):**
+- `meta-llama/Llama-3.3-70B-Instruct-Turbo` - Fast, good quality, cost-effective
+
+**High Quality (OpenRouter):**
+- `anthropic/claude-sonnet-4.5` - Latest, highest quality (more expensive)
+- `anthropic/claude-3.5-sonnet` - Fast and reliable
+- `anthropic/claude-3-opus` - Slower, highest quality
+
+**Alternative (Chutes.ai):**
+- `deepseek-ai/DeepSeek-V3.1` - Good performance, competitive pricing

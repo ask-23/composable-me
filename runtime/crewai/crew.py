@@ -210,9 +210,9 @@ Provide:
 4. Red flags if any (CTH, vague comp, level mismatch)
 5. Recommendation: PROCEED or PASS with brief rationale
 
-Output as structured YAML.
+Output as structured JSON.
 """,
-            expected_output="YAML fit analysis with role level, requirements, match percentage, red flags, and recommendation",
+            expected_output="JSON fit analysis with role level, requirements, match percentage, red flags, and recommendation",
             agent=self.commander,
         )
         
@@ -233,13 +233,13 @@ For each requirement, classify as:
 - gap: No evidence, needs interview
 - blocker: Critical requirement with no path
 
-Output structured YAML with:
+Output structured JSON with:
 - requirement
 - classification
 - evidence (if any)
 - framing_suggestion (for adjacent experience)
 """,
-            expected_output="YAML gap analysis mapping each JD requirement to evidence classification",
+            expected_output="JSON gap analysis mapping each JD requirement to evidence classification",
             agent=self.gap_analyzer,
             context=[fit_analysis],
         )
@@ -260,7 +260,7 @@ Focus on:
 Generate 8-12 questions grouped by theme.
 Use STAR+ format (Situation, Task, Actions, Results, Proof).
 """,
-            expected_output="Grouped interview questions in YAML format, 8-12 questions total",
+            expected_output="Grouped interview questions in JSON format, 8-12 questions total",
             agent=self.interrogator,
             context=[gap_analysis],
         )

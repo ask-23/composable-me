@@ -2,28 +2,87 @@
 
 A truth-constrained, multi-agent system for generating high-quality job applications.
 
-## Quick Start (CrewAI)
+## Quick Start
 
 ```bash
-# 1. Clone/download the repo
-cd composable-me
+# 1. Set your API key (choose one)
+export TOGETHER_API_KEY='tgp_v1_...'        # Recommended (Together AI)
+export OPENROUTER_API_KEY='sk-or-...'       # Alternative (OpenRouter)  
+export CHUTES_API_KEY='your-key'            # Alternative (Chutes.ai)
 
-# 2. Set your OpenRouter API key
-export OPENROUTER_API_KEY='sk-or-...'
+# 2. Run with your files
+./run.sh --jd path/to/job-description.md \
+         --resume path/to/your-resume.md \
+         --sources sources/ \
+         --out output/
 
-# 3. Run with sample files
-./run.sh examples/sample_jd.md examples/sample_resume.md
-
-# Or with interview notes
-./run.sh path/to/jd.md path/to/resume.md path/to/notes.md
+# Or with sample files
+./run.sh --jd examples/sample_jd.md \
+         --resume examples/sample_resume.md \
+         --sources examples/ \
+         --out output/
 ```
 
+## How to Use This Right Now
+
+**You have a job description and resume? Here's how to get tailored documents:**
+
+1. **Put your files in the right place:**
+   ```bash
+   # Your job description (any .md or .txt file)
+   cp your-job-posting.txt examples/my_jd.md
+   
+   # Your resume (any .md or .txt file)  
+   cp your-resume.pdf examples/my_resume.md  # Convert PDF to text first
+   
+   # Create a sources directory with your background materials
+   mkdir -p sources/
+   cp your-resume.md sources/
+   # Add any other docs that prove your experience
+   ```
+
+2. **Run the system:**
+   ```bash
+   ./run.sh --jd examples/my_jd.md \
+            --resume examples/my_resume.md \
+            --sources sources/ \
+            --out my_application/
+   ```
+
+3. **Get your results:**
+   ```bash
+   ls my_application/
+   # resume.md          <- Tailored resume
+   # cover_letter.md    <- Tailored cover letter  
+   # audit_report.yaml  <- Quality verification
+   # execution_log.txt  <- What the system did
+   ```
+
+**That's it!** The system will analyze the job, map your experience, and generate tailored documents.
+
+## File Picker Support
+
+The CLI includes file picker support for easier file selection:
+
+```bash
+# Interactive file selection (if supported)
+./run.sh --interactive
+
+# Or specify files directly
+./run.sh --jd "$(find . -name '*job*' -type f | head -1)" \
+         --resume "$(find . -name '*resume*' -type f | head -1)" \
+         --sources sources/ \
+         --out output/
+```
+
+## What the System Does
+
 The crew will:
-1. **Commander** — Analyze fit, extract requirements
-2. **Gap Analyzer** — Map JD requirements to your experience
-3. **Interrogator-Prepper** — Generate interview questions for gaps
-4. **Differentiator** — Find your unique positioning
-5. **Tailoring Agent** — Generate resume + cover letter
+1. **Gap Analyzer** — Map JD requirements to your experience
+2. **Interrogator-Prepper** — Generate interview questions for gaps
+3. **Differentiator** — Find your unique positioning
+4. **Tailoring Agent** — Generate resume + cover letter
+5. **ATS Optimizer** — Ensure keyword coverage
 6. **Auditor Suite** — Verify truth, tone, and compliance
 
 ## The Problem
@@ -54,10 +113,18 @@ source .venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Set API key
-export OPENROUTER_API_KEY='sk-or-...'
+# Set API key (choose one)
+export TOGETHER_API_KEY='tgp_v1_...'        # Recommended
+export OPENROUTER_API_KEY='sk-or-...'       # Alternative
 
-# Run directly
+# Run CLI directly
+python -m runtime.crewai.cli \
+    --jd examples/sample_jd.md \
+    --resume examples/sample_resume.md \
+    --sources examples/ \
+    --out output/
+
+# Or use the quick runner (simplified)
 python runtime/crewai/quick_crew.py \
     --jd examples/sample_jd.md \
     --resume examples/sample_resume.md \
@@ -66,15 +133,31 @@ python runtime/crewai/quick_crew.py \
 
 ## Configuration
 
-Environment variables:
-- `OPENROUTER_API_KEY` — **Required**. Get from [openrouter.ai/keys](https://openrouter.ai/keys)
-- `OPENROUTER_MODEL` — Optional. Default: `anthropic/claude-3.5-sonnet`
+### API Keys (choose one)
 
-Other models that work well:
-- `anthropic/claude-sonnet-4.5` — Latest, most advanced (if available)
-- `anthropic/claude-3.5-sonnet` — Fast, good quality (recommended)
-- `anthropic/claude-3-opus` — Slower, highest quality
-- `openai/gpt-4-turbo` — Alternative
+**Together AI (Recommended):**
+```bash
+export TOGETHER_API_KEY='tgp_v1_...'        # Get from together.ai
+export TOGETHER_MODEL='meta-llama/Llama-3.3-70B-Instruct-Turbo'  # Optional override
+```
+
+**OpenRouter (Alternative):**
+```bash
+export OPENROUTER_API_KEY='sk-or-...'       # Get from openrouter.ai/keys
+export OPENROUTER_MODEL='anthropic/claude-sonnet-4.5'  # Optional override
+```
+
+**Chutes.ai (Alternative):**
+```bash
+export CHUTES_API_KEY='your-key'            # Get from chutes.ai
+export CHUTES_MODEL='deepseek-ai/DeepSeek-V3.1'  # Optional override
+```
+
+### Recommended Models
+
+- **Llama 3.3 70B** (Together AI) — Fast, good quality, cost-effective
+- **Claude Sonnet 4.5** (OpenRouter) — Highest quality, more expensive
+- **DeepSeek V3.1** (Chutes.ai) — Good alternative
 
 ## Architecture
 
@@ -96,22 +179,24 @@ COMMANDER (Orchestrator)
 
 ## Quick Start
 
-### Option 1: Use as Prompts (Zero Setup)
+### Option 1: Full CLI (Recommended)
+
+```bash
+./run.sh --jd your-job.md --resume your-resume.md --sources sources/ --out output/
+```
+
+### Option 2: Quick Runner (Simplified)
+
+```bash
+python runtime/crewai/quick_crew.py --jd job.md --resume resume.md --out output.txt
+```
+
+### Option 3: Use as Prompts (Zero Setup)
 
 1. Copy agent prompts from `agents/*/prompt.md`
 2. Use with Claude, GPT-4, or similar
 3. Feed in your resume and JD
 4. Execute agents in sequence
-
-### Option 2: Go Implementation
-
-```bash
-cd runtime/go
-go build -o hydra
-./hydra --jd job.txt --resume resume.md
-```
-
-(Requires wiring up an LLM client—see `main.go`)
 
 ## Core Documents
 
@@ -134,6 +219,31 @@ go build -o hydra
 | Tailoring-Agent | Generate documents |
 | ATS-Optimizer | Keyword optimization |
 | Auditor-Suite | Truth/tone verification |
+
+## Troubleshooting
+
+**"No API key found" error:**
+```bash
+# Set one of these API keys
+export TOGETHER_API_KEY='tgp_v1_...'        # Recommended
+export OPENROUTER_API_KEY='sk-or-...'       # Alternative
+export CHUTES_API_KEY='your-key'            # Alternative
+```
+
+**"Invalid JSON output" error:**
+- This usually means the LLM is having trouble with structured output
+- Try switching to a different model or provider
+- Claude models (OpenRouter) tend to be more reliable for structured output
+
+**"Workflow failed: Document failed audit after maximum retries":**
+- This is expected behavior - the auditor found issues it couldn't auto-fix
+- Check the `audit_report.yaml` file for specific issues
+- The system is working correctly by refusing to approve flawed documents
+
+**Need help?**
+- Check the `execution_log.txt` file for detailed workflow steps
+- All outputs are saved even if the final audit fails
+- The system prioritizes truth over convenience
 
 ## Truth Laws (Non-Negotiable)
 

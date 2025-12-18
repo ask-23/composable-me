@@ -20,7 +20,7 @@ class TestHydraConfig:
             config = HydraConfig.from_env()
             
             assert config.openrouter_api_key == "sk-or-test-key"
-            assert config.openrouter_model == "anthropic/claude-3.5-sonnet"
+            assert config.openrouter_model == "anthropic/claude-sonnet-4.5"
     
     def test_config_from_env_missing_api_key(self):
         """Test config fails without API key"""
@@ -121,7 +121,7 @@ class TestHydraConfig:
         """Test config has correct default values"""
         config = HydraConfig(openrouter_api_key="sk-or-test-key")
         
-        assert config.openrouter_model == "anthropic/claude-3.5-sonnet"
+        assert config.openrouter_model == "anthropic/claude-sonnet-4.5"
         assert config.enable_research_agent is True
         assert config.auto_greenlight_threshold == 0.60
         assert config.max_agent_retries == 1
