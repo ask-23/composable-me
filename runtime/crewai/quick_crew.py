@@ -219,7 +219,7 @@ JOB DESCRIPTION:
 CANDIDATE RESUME:
 {resume}
 
-Output YAML with:
+Output JSON with:
 - role_level: (Junior/Mid/Senior/Lead/Principal/Architect/VP)
 - key_requirements: list of 5-10 key requirements
 - match_estimate: percentage
@@ -227,7 +227,7 @@ Output YAML with:
 - recommendation: PROCEED or PASS
 - rationale: 2-3 sentences
 """,
-        expected_output="YAML fit analysis",
+        expected_output="JSON fit analysis",
         agent=commander,
     )
     
@@ -247,7 +247,7 @@ For each requirement from the fit analysis, output:
 - evidence: quote or reference from resume (if any)
 - framing: how to position this (for adjacent/gap)
 """,
-        expected_output="YAML gap analysis",
+        expected_output="JSON gap analysis",
         agent=gap_analyzer,
         context=[task_fit],
     )

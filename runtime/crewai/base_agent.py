@@ -12,7 +12,15 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 from abc import ABC, abstractmethod
 import json
+import re
+from datetime import datetime
 from crewai import Agent, Task, Crew, Process, LLM
+
+# Constants
+DEFAULT_CONFIDENCE = 0.8
+MIN_CONFIDENCE = 0.0
+MAX_CONFIDENCE = 1.0
+DEFAULT_MAX_RETRIES = 1
 
 
 class ValidationError(Exception):
@@ -164,44 +172,59 @@ Return ONLY valid JSON. Do not include any text before or after the JSON object.
         Raises:
             ValidationError: If output is invalid JSON
         """
-        import re
+        cleaned_output = self._clean_output(output)
+        parsed = self._parse_json(cleaned_output)
+        self._promote_nested_base_fields(parsed)
+        self._validate_schema(parsed)
+        return parsed
+    
+    def _clean_output(self, output: str) -> str:
+        """Clean and extract JSON from raw output."""
+        cleaned = output.strip()
         
-        # Strip markdown code fences
-        cleaned_output = output.strip()
-        if cleaned_output.startswith("```json"):
-            cleaned_output = re.sub(r'^```json\s*\n?', '', cleaned_output)
-            cleaned_output = re.sub(r'\n?```\s*$', '', cleaned_output)
-        elif cleaned_output.startswith("```"):
-            cleaned_output = re.sub(r'^```\s*\n?', '', cleaned_output)
-            cleaned_output = re.sub(r'\n?```\s*$', '', cleaned_output)
-        cleaned_output = cleaned_output.strip()
+        # Remove markdown code fences
+        if cleaned.startswith("```json"):
+            cleaned = re.sub(r'^```json\s*\n?', '', cleaned)
+            cleaned = re.sub(r'\n?```\s*$', '', cleaned)
+        elif cleaned.startswith("```"):
+            cleaned = re.sub(r'^```\s*\n?', '', cleaned)
+            cleaned = re.sub(r'\n?```\s*$', '', cleaned)
         
-        # Try to extract JSON if there's surrounding text
-        # Look for first { and last }
-        first_brace = cleaned_output.find('{')
-        last_brace = cleaned_output.rfind('}')
+        cleaned = cleaned.strip()
+        
+        # Extract JSON from surrounding text
+        first_brace = cleaned.find('{')
+        last_brace = cleaned.rfind('}')
         
         if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-            cleaned_output = cleaned_output[first_brace:last_brace + 1]
+            cleaned = cleaned[first_brace:last_brace + 1]
         
-        # Try to parse JSON
+        return cleaned
+    
+    def _parse_json(self, json_str: str) -> Dict[str, Any]:
+        """Parse JSON string with error recovery."""
         try:
-            parsed = json.loads(cleaned_output)
+            parsed = json.loads(json_str)
         except json.JSONDecodeError as e:
             # Try to fix common JSON issues
             try:
                 # Fix trailing commas (common LLM mistake)
-                fixed_output = re.sub(r',(\s*[}\]])', r'\1', cleaned_output)
+                fixed = re.sub(r',(\s*[}\]])', r'\1', json_str)
                 # Fix single quotes (should be double quotes)
-                fixed_output = fixed_output.replace("'", '"')
-                parsed = json.loads(fixed_output)
+                fixed = fixed.replace("'", '"')
+                parsed = json.loads(fixed)
             except json.JSONDecodeError as e2:
-                raise ValidationError(f"Invalid JSON output: {e2}\n\nOutput was:\n{cleaned_output[:500]}")
+                raise ValidationError(f"Invalid JSON output: {e2}\n\nOutput was:\n{json_str[:500]}")
         
+        # Validate that result is a dictionary
         if not isinstance(parsed, dict):
             raise ValidationError("Output must be a JSON object (dictionary)")
         
-        # Check if base fields are nested in a top-level key
+        return parsed
+    
+    def _promote_nested_base_fields(self, parsed: Dict[str, Any]) -> None:
+        """Promote base fields from nested structure if needed."""
+        # Check if base fields are nested in a single top-level key
         if len(parsed) == 1 and "agent" not in parsed:
             nested_key = list(parsed.keys())[0]
             nested_data = parsed[nested_key]
@@ -210,9 +233,6 @@ Return ONLY valid JSON. Do not include any text before or after the JSON object.
                 for field in ["agent", "timestamp", "confidence"]:
                     if field in nested_data:
                         parsed[field] = nested_data[field]
-        
-        self._validate_schema(parsed)
-        return parsed
     
     def _validate_schema(self, data: Dict[str, Any]) -> None:
         """
@@ -226,8 +246,6 @@ Return ONLY valid JSON. Do not include any text before or after the JSON object.
         Raises:
             ValidationError: If required fields are missing
         """
-        from datetime import datetime
-        
         # All agents must include these fields - add defaults if missing
         if "agent" not in data:
             data["agent"] = self.role
@@ -236,25 +254,27 @@ Return ONLY valid JSON. Do not include any text before or after the JSON object.
             data["timestamp"] = datetime.now().isoformat() + "Z"
         
         if "confidence" not in data:
-            data["confidence"] = 0.8  # Default confidence
+            data["confidence"] = DEFAULT_CONFIDENCE
         
-        # Validate confidence is a number between 0 and 1
-        confidence = data.get("confidence")
+        # Validate and normalize confidence
+        data["confidence"] = self._normalize_confidence(data["confidence"])
+    
+    def _normalize_confidence(self, confidence: Any) -> float:
+        """Normalize confidence value to valid range [0.0, 1.0]."""
         if not isinstance(confidence, (int, float)):
             # Try to convert if it's a string
             try:
                 confidence = float(confidence)
-                data["confidence"] = confidence
             except (ValueError, TypeError):
-                data["confidence"] = 0.8  # Fallback
+                return DEFAULT_CONFIDENCE
         
-        if not 0.0 <= data["confidence"] <= 1.0:
-            data["confidence"] = max(0.0, min(1.0, data["confidence"]))  # Clamp to valid range
+        # Clamp to valid range
+        return max(MIN_CONFIDENCE, min(MAX_CONFIDENCE, float(confidence)))
     
     def execute_with_retry(
         self,
         task: Task,
-        max_retries: int = 1
+        max_retries: int = DEFAULT_MAX_RETRIES
     ) -> Dict[str, Any]:
         """
         Execute task with retry logic.
