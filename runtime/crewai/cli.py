@@ -7,6 +7,7 @@ Usage:
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import Iterable
@@ -15,6 +16,55 @@ import yaml
 
 from runtime.crewai.hydra_workflow import HydraWorkflow
 from runtime.crewai.llm_client import get_llm_client, LLMClientError
+
+
+def _get_repo_root() -> Path:
+    """
+    Find the repository root directory by looking for .git/ or requirements.txt.
+    
+    Searches upward from the current working directory until it finds a directory
+    containing either .git/ or requirements.txt, which indicates the repo root.
+    
+    Returns:
+        Path: The repository root directory
+        
+    Raises:
+        FileNotFoundError: If no repo root indicators are found
+    """
+    current = Path.cwd()
+    
+    # Search upward through parent directories
+    for path in [current] + list(current.parents):
+        # Check for .git directory or requirements.txt file
+        if (path / ".git").exists() or (path / "requirements.txt").exists():
+            return path
+    
+    # If we can't find repo root, raise an error
+    raise FileNotFoundError(
+        "Could not find repository root. Looking for directory containing .git/ or requirements.txt"
+    )
+
+
+def _validate_repo_structure(repo_root: Path) -> None:
+    """
+    Validate that the repository has expected directories.
+    
+    Args:
+        repo_root: The repository root directory
+        
+    Raises:
+        FileNotFoundError: If expected directories are missing
+    """
+    expected_dirs = ["inputs", "examples"]
+    missing_dirs = []
+    
+    for dir_name in expected_dirs:
+        if not (repo_root / dir_name).exists():
+            missing_dirs.append(dir_name)
+    
+    if missing_dirs:
+        print(f"⚠️  Warning: Expected directories not found: {', '.join(missing_dirs)}")
+        print(f"   Repository root: {repo_root}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -27,8 +77,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--resume", required=True, help="Path to resume file")
     parser.add_argument(
         "--sources",
-        required=True,
-        help="Path to directory containing source documents for truth verification",
+        help="Path to directory containing source documents for truth verification (defaults to same directory as --jd file)",
     )
     parser.add_argument(
         "--out",
@@ -102,10 +151,36 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    # Detect and change to repository root directory
+    try:
+        repo_root = _get_repo_root()
+        os.chdir(repo_root)
+        _validate_repo_structure(repo_root)
+    except FileNotFoundError as err:
+        parser.error(str(err))
+
+    # Resolve paths relative to repo root
     jd_path = Path(args.jd)
     resume_path = Path(args.resume)
-    sources_dir = Path(args.sources)
+    
+    # Default sources to same directory as JD file if not specified
+    if args.sources:
+        sources_dir = Path(args.sources)
+    else:
+        sources_dir = jd_path.parent
+        print(f"ℹ️  No --sources specified, defaulting to: {sources_dir}")
+    
     out_dir = Path(args.out)
+
+    # Validate that all input paths exist
+    if not jd_path.exists():
+        parser.error(f"Job description file not found: {jd_path}")
+    if not resume_path.exists():
+        parser.error(f"Resume file not found: {resume_path}")
+    if not sources_dir.exists():
+        parser.error(f"Sources directory not found: {sources_dir}")
+    if not sources_dir.is_dir():
+        parser.error(f"Sources path must be a directory: {sources_dir}")
 
     try:
         jd_text = _read_file(jd_path)

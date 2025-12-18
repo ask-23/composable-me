@@ -19,6 +19,52 @@ type Config struct {
 	Verbose     bool
 }
 
+// getRepoRoot finds the repository root by looking for .git/ or requirements.txt
+func getRepoRoot() (string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	// Search upward through parent directories
+	current := wd
+	for {
+		// Check for .git directory or requirements.txt file
+		if _, err := os.Stat(filepath.Join(current, ".git")); err == nil {
+			return current, nil
+		}
+		if _, err := os.Stat(filepath.Join(current, "requirements.txt")); err == nil {
+			return current, nil
+		}
+
+		parent := filepath.Dir(current)
+		if parent == current {
+			// Reached filesystem root
+			break
+		}
+		current = parent
+	}
+
+	return "", fmt.Errorf("could not find repository root (looking for .git/ or requirements.txt)")
+}
+
+// validateRepoStructure checks for expected directories and warns if missing
+func validateRepoStructure(repoRoot string) {
+	expectedDirs := []string{"inputs", "examples"}
+	var missingDirs []string
+
+	for _, dir := range expectedDirs {
+		if _, err := os.Stat(filepath.Join(repoRoot, dir)); os.IsNotExist(err) {
+			missingDirs = append(missingDirs, dir)
+		}
+	}
+
+	if len(missingDirs) > 0 {
+		fmt.Printf("⚠️  Warning: Expected directories not found: %s\n", strings.Join(missingDirs, ", "))
+		fmt.Printf("   Repository root: %s\n", repoRoot)
+	}
+}
+
 func main() {
 	fmt.Println("Composable Me Hydra - Interactive CLI")
 	fmt.Println("=====================================")
@@ -27,12 +73,19 @@ func main() {
 		OutPath: "output/",
 	}
 
-	// Get current working directory
-	wd, err := os.Getwd()
+	// Detect and change to repository root directory
+	repoRoot, err := getRepoRoot()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting current directory: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error finding repository root: %v\n", err)
 		os.Exit(1)
 	}
+
+	if err := os.Chdir(repoRoot); err != nil {
+		fmt.Fprintf(os.Stderr, "Error changing to repository root: %v\n", err)
+		os.Exit(1)
+	}
+
+	validateRepoStructure(repoRoot)
 
 	// Parse command line arguments
 	args := os.Args[1:]
@@ -84,39 +137,40 @@ func main() {
 		config.ResumePath = strings.TrimSpace(config.ResumePath)
 	}
 
+	// Default sources to same directory as JD file if not specified
 	if config.SourcesPath == "" {
-		fmt.Print("Enter path to sources directory: ")
-		config.SourcesPath, _ = reader.ReadString('\n')
-		config.SourcesPath = strings.TrimSpace(config.SourcesPath)
+		if config.JDPath != "" {
+			config.SourcesPath = filepath.Dir(config.JDPath)
+			fmt.Printf("ℹ️  No --sources specified, defaulting to: %s\n", config.SourcesPath)
+		} else {
+			fmt.Print("Enter path to sources directory: ")
+			config.SourcesPath, _ = reader.ReadString('\n')
+			config.SourcesPath = strings.TrimSpace(config.SourcesPath)
+		}
 	}
 
-	// Validate paths
-	if !filepath.IsAbs(config.JDPath) {
-		config.JDPath = filepath.Join(wd, config.JDPath)
-	}
-	if !filepath.IsAbs(config.ResumePath) {
-		config.ResumePath = filepath.Join(wd, config.ResumePath)
-	}
-	if !filepath.IsAbs(config.SourcesPath) {
-		config.SourcesPath = filepath.Join(wd, config.SourcesPath)
-	}
-	if !filepath.IsAbs(config.OutPath) {
-		config.OutPath = filepath.Join(wd, config.OutPath)
-	}
+	// Paths are now relative to repo root (we already changed to repo root)
+	// No need to adjust paths unless they're absolute
 
-	// Check if files/directories exist
+	// Validate that all input paths exist
 	if _, err := os.Stat(config.JDPath); os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "Job description file does not exist: %s\n", config.JDPath)
+		fmt.Fprintf(os.Stderr, "Job description file not found: %s\n", config.JDPath)
 		os.Exit(1)
 	}
 
 	if _, err := os.Stat(config.ResumePath); os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "Resume file does not exist: %s\n", config.ResumePath)
+		fmt.Fprintf(os.Stderr, "Resume file not found: %s\n", config.ResumePath)
 		os.Exit(1)
 	}
 
 	if _, err := os.Stat(config.SourcesPath); os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "Sources directory does not exist: %s\n", config.SourcesPath)
+		fmt.Fprintf(os.Stderr, "Sources directory not found: %s\n", config.SourcesPath)
+		os.Exit(1)
+	}
+
+	// Validate that sources path is a directory
+	if info, err := os.Stat(config.SourcesPath); err == nil && !info.IsDir() {
+		fmt.Fprintf(os.Stderr, "Sources path must be a directory: %s\n", config.SourcesPath)
 		os.Exit(1)
 	}
 
@@ -167,11 +221,10 @@ func main() {
 		}
 	}
 
-	// Create virtual environment if needed
-	if _, err := os.Stat(filepath.Join(wd, ".venv")); os.IsNotExist(err) {
+	// Create virtual environment if needed (now in repo root)
+	if _, err := os.Stat(".venv"); os.IsNotExist(err) {
 		fmt.Println("Creating virtual environment...")
 		cmd := exec.Command("python3", "-m", "venv", ".venv")
-		cmd.Dir = wd
 		if err := cmd.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating virtual environment: %v\n", err)
 			os.Exit(1)
@@ -180,14 +233,13 @@ func main() {
 
 	// Activate virtual environment and install dependencies
 	fmt.Println("Installing dependencies...")
-	pipPath := filepath.Join(wd, ".venv", "bin", "pip")
+	pipPath := filepath.Join(".venv", "bin", "pip")
 
 	// Check if dependencies are already installed
 	cmd := exec.Command(pipPath, "show", "crewai")
 	if err := cmd.Run(); err != nil {
 		// Install dependencies
-		cmd = exec.Command(pipPath, "install", "-r", filepath.Join(wd, "requirements.txt"))
-		cmd.Dir = wd
+		cmd = exec.Command(pipPath, "install", "-r", "requirements.txt")
 		if config.Verbose {
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
@@ -222,9 +274,9 @@ func main() {
 	fmt.Printf("Sources: %s\n", config.SourcesPath)
 	fmt.Printf("Output directory: %s\n", config.OutPath)
 
-	pythonPath := filepath.Join(wd, ".venv", "bin", "python")
+	pythonPath := filepath.Join(".venv", "bin", "python")
 	cmd = exec.Command(pythonPath, pythonArgs...)
-	cmd.Dir = wd
+	// We're already in repo root, so no need to change directory
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
