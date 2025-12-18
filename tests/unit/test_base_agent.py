@@ -1,11 +1,11 @@
 """
 Unit tests for BaseHydraAgent.
 
-Tests YAML validation, prompt loading, and error handling.
+Tests JSON validation, prompt loading, and error handling.
 """
 
 import pytest
-import yaml
+import json
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
 
@@ -29,7 +29,10 @@ class TestBaseHydraAgent:
     @pytest.fixture
     def mock_llm(self):
         """Create a mock LLM instance"""
-        return Mock(spec=LLM)
+        from crewai import LLM
+        # Create a real LLM instance with minimal config for testing
+        # This avoids validation errors when creating agents
+        return LLM(model="gpt-4", api_key="test-key")
     
     @pytest.fixture
     def test_agent(self, mock_llm):
@@ -45,14 +48,14 @@ class TestBaseHydraAgent:
         assert agent.goal == "Test goal"
         assert agent.expected_output == "Test output"
     
-    def test_validate_output_valid_yaml(self, test_agent):
-        """Test validation of valid YAML output"""
-        valid_output = """
-agent: Test Agent
-timestamp: 2024-01-01T00:00:00
-confidence: 0.95
-result: success
-"""
+    def test_validate_output_valid_json(self, test_agent):
+        """Test validation of valid JSON output"""
+        valid_output = """{
+    "agent": "Test Agent",
+    "timestamp": "2024-01-01T00:00:00",
+    "confidence": 0.95,
+    "result": "success"
+}"""
         
         result = test_agent.validate_output(valid_output)
         
@@ -60,61 +63,122 @@ result: success
         assert result["confidence"] == 0.95
         assert result["result"] == "success"
     
-    def test_validate_output_invalid_yaml(self, test_agent):
-        """Test validation fails on invalid YAML"""
-        invalid_output = """
-agent: Test Agent
-  invalid: indentation
-    more: problems
-"""
+    def test_validate_output_invalid_json(self, test_agent):
+        """Test validation fails on invalid JSON"""
+        invalid_output = """{
+    "agent": "Test Agent",
+    "invalid": "missing comma"
+    "more": "problems"
+}"""
         
-        with pytest.raises(ValidationError, match="Invalid YAML output"):
+        with pytest.raises(ValidationError, match="Invalid JSON output"):
             test_agent.validate_output(invalid_output)
     
     def test_validate_output_missing_required_fields(self, test_agent):
-        """Test validation fails when required fields are missing"""
-        # Missing 'confidence' field
-        incomplete_output = """
-agent: Test Agent
-timestamp: 2024-01-01T00:00:00
-"""
+        """Test validation handles missing required fields by adding defaults"""
+        # Missing 'confidence' field - should be added as default
+        incomplete_output = """{
+    "agent": "Test Agent",
+    "timestamp": "2024-01-01T00:00:00"
+}"""
         
-        with pytest.raises(ValidationError, match="Missing required field: confidence"):
-            test_agent.validate_output(incomplete_output)
+        result = test_agent.validate_output(incomplete_output)
+        
+        # Should add default confidence
+        assert result["agent"] == "Test Agent"
+        assert result["confidence"] == 0.8  # Default confidence
     
     def test_validate_output_invalid_confidence(self, test_agent):
-        """Test validation fails when confidence is out of range"""
-        # Confidence > 1.0
-        invalid_output = """
-agent: Test Agent
-timestamp: 2024-01-01T00:00:00
-confidence: 1.5
-"""
+        """Test validation clamps confidence when out of range"""
+        # Confidence > 1.0 - should be clamped to 1.0
+        invalid_output = """{
+    "agent": "Test Agent",
+    "timestamp": "2024-01-01T00:00:00",
+    "confidence": 1.5
+}"""
         
-        with pytest.raises(ValidationError, match="Confidence must be between 0.0 and 1.0"):
-            test_agent.validate_output(invalid_output)
+        result = test_agent.validate_output(invalid_output)
+        
+        # Should clamp to 1.0
+        assert result["confidence"] == 1.0
     
     def test_validate_output_confidence_not_number(self, test_agent):
-        """Test validation fails when confidence is not a number"""
-        invalid_output = """
-agent: Test Agent
-timestamp: 2024-01-01T00:00:00
-confidence: "high"
-"""
+        """Test validation handles non-numeric confidence by using default"""
+        invalid_output = """{
+    "agent": "Test Agent",
+    "timestamp": "2024-01-01T00:00:00",
+    "confidence": "high"
+}"""
         
-        with pytest.raises(ValidationError, match="Confidence must be a number"):
-            test_agent.validate_output(invalid_output)
+        result = test_agent.validate_output(invalid_output)
+        
+        # Should use default confidence when conversion fails
+        assert result["confidence"] == 0.8
     
     def test_validate_output_not_dict(self, test_agent):
         """Test validation fails when output is not a dictionary"""
-        invalid_output = """
-- item1
-- item2
-- item3
-"""
+        invalid_output = """[
+    "item1",
+    "item2", 
+    "item3"
+]"""
         
-        with pytest.raises(ValidationError, match="Output must be a YAML dictionary"):
+        with pytest.raises(ValidationError, match="Output must be a JSON object"):
             test_agent.validate_output(invalid_output)
+    
+    def test_validate_output_with_markdown_fences(self, test_agent):
+        """Test validation handles JSON wrapped in markdown code fences"""
+        output_with_fences = """```json
+{
+    "agent": "Test Agent",
+    "timestamp": "2024-01-01T00:00:00",
+    "confidence": 0.95,
+    "result": "success"
+}
+```"""
+        
+        result = test_agent.validate_output(output_with_fences)
+        
+        assert result["agent"] == "Test Agent"
+        assert result["confidence"] == 0.95
+        assert result["result"] == "success"
+    
+    def test_validate_output_with_surrounding_text(self, test_agent):
+        """Test validation extracts JSON from surrounding text"""
+        output_with_text = """Here is my analysis:
+
+{
+    "agent": "Test Agent",
+    "timestamp": "2024-01-01T00:00:00",
+    "confidence": 0.95,
+    "result": "success"
+}
+
+That completes the analysis."""
+        
+        result = test_agent.validate_output(output_with_text)
+        
+        assert result["agent"] == "Test Agent"
+        assert result["confidence"] == 0.95
+        assert result["result"] == "success"
+    
+    def test_validate_output_nested_structure_promotion(self, test_agent):
+        """Test validation promotes base fields from nested structure"""
+        nested_output = """{
+    "analysis": {
+        "agent": "Test Agent",
+        "timestamp": "2024-01-01T00:00:00",
+        "confidence": 0.95,
+        "findings": ["item1", "item2"]
+    }
+}"""
+        
+        result = test_agent.validate_output(nested_output)
+        
+        # Base fields should be promoted to top level
+        assert result["agent"] == "Test Agent"
+        assert result["confidence"] == 0.95
+        assert result["analysis"]["findings"] == ["item1", "item2"]
     
     def test_create_agent(self, test_agent):
         """Test agent creation"""
@@ -129,7 +193,12 @@ confidence: "high"
         description = "Test task description"
         task = test_agent.create_task(description)
         
-        assert task.description == description
+        # Description should be enhanced with JSON format instructions
+        assert description in task.description
+        assert "valid JSON" in task.description
+        assert "agent" in task.description
+        assert "timestamp" in task.description
+        assert "confidence" in task.description
         assert task.expected_output == "Test output"
         assert task.agent.role == "Test Agent"
     
@@ -148,7 +217,9 @@ confidence: "high"
         
         task = test_agent.create_task(description, context=[mock_context_task])
         
-        assert task.description == description
+        # Description should be enhanced with JSON format instructions
+        assert description in task.description
+        assert "valid JSON" in task.description
         assert len(task.context) == 1
         assert task.context[0] == mock_context_task
     
@@ -181,11 +252,11 @@ confidence: "high"
         """Test execute_with_retry succeeds on first attempt"""
         # Mock the Crew instance and its kickoff method
         mock_crew_instance = Mock()
-        mock_crew_instance.kickoff.return_value = """
-agent: Test Agent
-timestamp: 2024-01-01T00:00:00
-confidence: 0.95
-"""
+        mock_crew_instance.kickoff.return_value = """{
+    "agent": "Test Agent",
+    "timestamp": "2024-01-01T00:00:00",
+    "confidence": 0.95
+}"""
         mock_crew_class.return_value = mock_crew_instance
         
         mock_task = Mock()
@@ -204,11 +275,11 @@ confidence: 0.95
         # First call fails, second succeeds
         mock_crew_instance.kickoff.side_effect = [
             Exception("First attempt failed"),
-            """
-agent: Test Agent
-timestamp: 2024-01-01T00:00:00
-confidence: 0.95
-"""
+            """{
+    "agent": "Test Agent",
+    "timestamp": "2024-01-01T00:00:00",
+    "confidence": 0.95
+}"""
         ]
         mock_crew_class.return_value = mock_crew_instance
         
