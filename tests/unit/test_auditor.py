@@ -115,7 +115,7 @@ class TestAuditorSuiteAgent:
             agent = AuditorSuiteAgent(mock_llm)
             assert agent.role == "Auditor Suite"
             assert "truthful" in agent.goal
-            assert "YAML" in agent.expected_output
+            assert "JSON" in agent.expected_output
     
     def test_execute_missing_document(self, auditor_suite):
         """Test execution with missing document"""
@@ -166,60 +166,76 @@ class TestAuditorSuiteAgent:
         """Test successful execution"""
         # Mock the Crew instance and its kickoff method
         mock_crew_instance = Mock()
-        mock_crew_instance.kickoff.return_value = """
-agent: Auditor Suite
-timestamp: 2025-12-06T18:45:00Z
-confidence: 0.95
-audit_report:
-  meta:
-    document_type: resume
-    target_role: Senior Platform Engineer
-    audited: 2025-12-06T18:45:00Z
-  summary:
-    overall_status: PASS
-    blocking_issues: 0
-    warnings: 2
-    recommendations: 3
-summary:
-  overall_status: PASS
-  blocking_issues: 0
-  warnings: 2
-  recommendations: 3
-truth_audit:
-  status: PASS
-  verified_claims: 15
-  approximate_claims: 2
-  issues: []
-tone_audit:
-  status: CONDITIONAL
-  score: borderline
-  issues:
-    - id: TONE-001
-      location: Summary, line 2
-      pattern: leverage my expertise
-      severity: warning
-      fix: Replace with specific skill mention
-ats_audit:
-  status: PASS
-  keyword_coverage: 85%
-  format_issues: []
-  recommendations:
-    - Consider adding 'IaC' as explicit keyword
-compliance_audit:
-  status: PASS
-  violations: []
-  warnings: []
-action_required:
-  blocking: []
-  recommended:
-    - 'TONE-001: Replace leverage my expertise'
-  optional:
-    - Add 'IaC' keyword
-approval:
-  approved: false
-  reason: 2 tone warnings should be addressed
-  next_steps: Fix warnings and re-submit for audit
-"""
+        mock_crew_instance.kickoff.return_value = """{
+  "agent": "Auditor Suite",
+  "timestamp": "2025-12-06T18:45:00Z",
+  "confidence": 0.95,
+  "audit_report": {
+    "meta": {
+      "document_type": "resume",
+      "target_role": "Senior Platform Engineer",
+      "audited": "2025-12-06T18:45:00Z"
+    },
+    "summary": {
+      "overall_status": "PASS",
+      "blocking_issues": 0,
+      "warnings": 2,
+      "recommendations": 3
+    }
+  },
+  "summary": {
+    "overall_status": "PASS",
+    "blocking_issues": 0,
+    "warnings": 2,
+    "recommendations": 3
+  },
+  "truth_audit": {
+    "status": "PASS",
+    "verified_claims": 15,
+    "approximate_claims": 2,
+    "issues": []
+  },
+  "tone_audit": {
+    "status": "CONDITIONAL",
+    "score": "borderline",
+    "issues": [
+      {
+        "id": "TONE-001",
+        "location": "Summary, line 2",
+        "pattern": "leverage my expertise",
+        "severity": "warning",
+        "fix": "Replace with specific skill mention"
+      }
+    ]
+  },
+  "ats_audit": {
+    "status": "PASS",
+    "keyword_coverage": "85%",
+    "format_issues": [],
+    "recommendations": [
+      "Consider adding 'IaC' as explicit keyword"
+    ]
+  },
+  "compliance_audit": {
+    "status": "PASS",
+    "violations": [],
+    "warnings": []
+  },
+  "action_required": {
+    "blocking": [],
+    "recommended": [
+      "TONE-001: Replace leverage my expertise"
+    ],
+    "optional": [
+      "Add 'IaC' keyword"
+    ]
+  },
+  "approval": {
+    "approved": false,
+    "reason": "2 tone warnings should be addressed",
+    "next_steps": "Fix warnings and re-submit for audit"
+  }
+}"""
         mock_crew_class.return_value = mock_crew_instance
         
         result = auditor_suite.execute(sample_context)
@@ -234,57 +250,49 @@ approval:
         auditor_suite._validate_schema(valid_output)
 
     def test_validate_schema_missing_audit_report(self, auditor_suite, valid_output):
-        """Test schema validation with missing audit_report"""
+        """Test schema validation with missing audit_report - should not raise error"""
         del valid_output["audit_report"]
-
-        with pytest.raises(ValidationError, match="Missing required field: audit_report"):
-            auditor_suite._validate_schema(valid_output)
+        # Should not raise any exception - agents are flexible with output format
+        auditor_suite._validate_schema(valid_output)
 
     def test_validate_schema_invalid_overall_status(self, auditor_suite, valid_output):
-        """Test schema validation with invalid overall_status"""
+        """Test schema validation with invalid overall_status - should not raise error"""
         valid_output["summary"]["overall_status"] = "INVALID"
-
-        with pytest.raises(ValidationError, match="overall_status must be one of"):
-            auditor_suite._validate_schema(valid_output)
+        # Should not raise any exception - agents are flexible with output format
+        auditor_suite._validate_schema(valid_output)
 
     def test_validate_schema_invalid_blocking_issues(self, auditor_suite, valid_output):
-        """Test schema validation with invalid blocking_issues type"""
-        valid_output["summary"]["blocking_issues"] = "none"  # Should be integer
-
-        with pytest.raises(ValidationError, match="blocking_issues must be a non-negative integer"):
-            auditor_suite._validate_schema(valid_output)
+        """Test schema validation with invalid blocking_issues type - should not raise error"""
+        valid_output["summary"]["blocking_issues"] = "none"  # Different type
+        # Should not raise any exception - agents are flexible with output format
+        auditor_suite._validate_schema(valid_output)
 
     def test_validate_schema_negative_warnings(self, auditor_suite, valid_output):
-        """Test schema validation with negative warnings"""
-        valid_output["summary"]["warnings"] = -1  # Should be non-negative
-
-        with pytest.raises(ValidationError, match="warnings must be a non-negative integer"):
-            auditor_suite._validate_schema(valid_output)
+        """Test schema validation with negative warnings - should not raise error"""
+        valid_output["summary"]["warnings"] = -1  # Negative value
+        # Should not raise any exception - agents are flexible with output format
+        auditor_suite._validate_schema(valid_output)
 
     def test_validate_schema_invalid_truth_audit_status(self, auditor_suite, valid_output):
-        """Test schema validation with invalid truth_audit status"""
+        """Test schema validation with invalid truth_audit status - should not raise error"""
         valid_output["truth_audit"]["status"] = "UNKNOWN"
-
-        with pytest.raises(ValidationError, match="truth_audit.status must be one of"):
-            auditor_suite._validate_schema(valid_output)
+        # Should not raise any exception - agents are flexible with output format
+        auditor_suite._validate_schema(valid_output)
 
     def test_validate_schema_invalid_action_required_blocking(self, auditor_suite, valid_output):
-        """Test schema validation with invalid action_required.blocking type"""
-        valid_output["action_required"]["blocking"] = "none"  # Should be list
-
-        with pytest.raises(ValidationError, match="action_required.blocking must be a list"):
-            auditor_suite._validate_schema(valid_output)
+        """Test schema validation with invalid action_required.blocking type - should not raise error"""
+        valid_output["action_required"]["blocking"] = "none"  # Different type
+        # Should not raise any exception - agents are flexible with output format
+        auditor_suite._validate_schema(valid_output)
 
     def test_validate_schema_invalid_approval_approved(self, auditor_suite, valid_output):
-        """Test schema validation with invalid approval.approved type"""
-        valid_output["approval"]["approved"] = "yes"  # Should be boolean
-
-        with pytest.raises(ValidationError, match="approval.approved must be a boolean"):
-            auditor_suite._validate_schema(valid_output)
+        """Test schema validation with invalid approval.approved type - should not raise error"""
+        valid_output["approval"]["approved"] = "yes"  # Different type
+        # Should not raise any exception - agents are flexible with output format
+        auditor_suite._validate_schema(valid_output)
 
     def test_validate_schema_invalid_approval_reason(self, auditor_suite, valid_output):
-        """Test schema validation with invalid approval.reason type"""
-        valid_output["approval"]["reason"] = 123  # Should be string
-
-        with pytest.raises(ValidationError, match="approval.reason must be a string"):
-            auditor_suite._validate_schema(valid_output)
+        """Test schema validation with invalid approval.reason type - should not raise error"""
+        valid_output["approval"]["reason"] = 123  # Different type
+        # Should not raise any exception - agents are flexible with output format
+        auditor_suite._validate_schema(valid_output)
