@@ -9,6 +9,13 @@ MODE="${1:-both}"
 run_backend() {
     echo "Starting Litestar backend on http://localhost:8000..."
     source .venv/bin/activate 2>/dev/null || true
+    # Source .env file if it exists to load API keys
+    if [ -f .env ]; then
+        set -a
+        source .env
+        set +a
+        echo "Loaded environment from .env"
+    fi
     export PYTHONPATH="${PWD}:${PYTHONPATH}"
     pip install -q litestar uvicorn pydantic python-multipart sse-starlette python-dotenv 2>/dev/null
     python -m uvicorn web.backend.app:app --host 0.0.0.0 --port 8000 --reload
