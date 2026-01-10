@@ -34,7 +34,7 @@ test.describe('Job Progress Page', () => {
         await expect(page).toHaveURL(/\/jobs\/[a-f0-9-]+/, { timeout: 10000 });
 
         // Check page structure
-        await expect(page.locator('h1')).toContainText('Job Progress');
+        await expect(page.getByRole('heading', { name: 'Job Progress' })).toBeVisible();
         await expect(page.locator('.job-id')).toBeVisible();
 
         // Progress container should exist
@@ -67,7 +67,7 @@ test.describe('Job Progress Page', () => {
         await expect(page.locator('text=Tailoring')).toBeVisible();
         await expect(page.locator('text=ATS Optimization')).toBeVisible();
         await expect(page.locator('text=Auditing')).toBeVisible();
-        await expect(page.locator('text=Complete')).toBeVisible();
+        await expect(page.getByText('Complete', { exact: true })).toBeVisible();
     });
 
     test('timer starts on page load', async ({ page }) => {

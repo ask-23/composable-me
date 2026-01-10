@@ -1,0 +1,6 @@
+Engineering Manager, AI Capabilities – Zapier
+Fully remote (two locations noted) .
+Zapier’s AI Capabilities team builds the internal AI platform used to power AI features across the company.  The manager leads a team to design reusable APIs, orchestrate large‑language‑model services and infrastructure, and collaborate with product, infrastructure and AI teams .  Requirements include hands‑on experience shipping LLM‑powered products, platform‑building experience, strong leadership and fluency in Zapier’s tech stack (TypeScript, React, Node.js, Python, Django) .
+Full‑time
+Salary not disclosed; remote roles at Zapier typically offer market‑competitive pay.
+Zapier job description .
