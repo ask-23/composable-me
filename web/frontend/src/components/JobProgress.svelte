@@ -83,6 +83,10 @@
       const data: SSEProgressEvent = JSON.parse(e.data);
       state = data.state;
       progress = data.progress;
+      // Update agent models if provided in progress event
+      if (data.agent_models) {
+        agent_models = data.agent_models;
+      }
     });
 
     eventSource.addEventListener("log", (e) => {
@@ -167,12 +171,17 @@
     {#each STAGES as stageName, i}
       <div
         class="stage"
-        class:active={i === currentStageIndex}
-        class:complete={i < currentStageIndex}
-        class:pending={i > currentStageIndex}
+        class:active={i === currentStageIndex && !isComplete}
+        class:complete={i < currentStageIndex ||
+          (i === currentStageIndex && isComplete && state === "completed")}
+        class:pending={i > currentStageIndex &&
+          !(isComplete && state === "completed")}
+        class:failed={isComplete &&
+          state === "failed" &&
+          i >= currentStageIndex}
       >
         <div class="stage-dot">
-          {#if i < currentStageIndex}
+          {#if i < currentStageIndex || (i === currentStageIndex && isComplete && state === "completed")}
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="12"

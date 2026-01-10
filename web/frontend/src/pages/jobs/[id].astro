@@ -1,7 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import JobProgress from '../../components/JobProgress.svelte';
-import ResultsViewer from '../../components/ResultsViewer.svelte';
+import JobPage from '../../components/JobPage.svelte';
 import type { Job } from '../../lib/types';
 
 const { id } = Astro.params;
@@ -23,8 +22,6 @@ try {
 } catch (e) {
   error = 'Failed to connect to backend. Is the API server running?';
 }
-
-const isComplete = job?.state === 'completed' || job?.state === 'failed';
 ---
 
 <Layout title={`Job ${id?.slice(0, 8)}...`}>
@@ -44,35 +41,11 @@ const isComplete = job?.state === 'completed' || job?.state === 'failed';
     )}
 
     {!error && job && (
-      <Fragment>
-        <!-- Progress tracker (client-side for live updates) -->
-        <div class="card progress-card">
-          <JobProgress
-            client:load
-            jobId={id!}
-            initialState={job.state}
-          />
-        </div>
-
-        <!-- Results viewer (shown when complete) -->
-        {isComplete ? (
-          <div class="results-section">
-            <ResultsViewer
-              client:visible
-              documents={job.final_documents}
-              auditReport={job.audit_report}
-              intermediateResults={job.intermediate_results}
-              auditFailed={job.audit_failed}
-              auditError={job.audit_error}
-              agentModels={job.agent_models}
-            />
-          </div>
-        ) : (
-          <div class="waiting-card card">
-            <p>Results will appear here when processing completes...</p>
-          </div>
-        )}
-      </Fragment>
+      <JobPage
+        client:load
+        jobId={id!}
+        initialJob={job}
+      />
     )}
 
     {!error && !job && (
@@ -82,14 +55,6 @@ const isComplete = job?.state === 'completed' || job?.state === 'failed';
     )}
   </div>
 </Layout>
-
-<script>
-  // Client-side: Listen for completion to show results
-  document.addEventListener('DOMContentLoaded', () => {
-    // The JobProgress component will emit events when complete
-    // Results viewer will be hydrated when scrolled into view
-  });
-</script>
 
 <style>
   .job-page {
@@ -121,20 +86,6 @@ const isComplete = job?.state === 'completed' || job?.state === 'failed';
     color: var(--color-text-muted);
     font-family: monospace;
     font-size: 0.9rem;
-  }
-
-  .progress-card {
-    margin-bottom: 2rem;
-  }
-
-  .results-section {
-    margin-top: 2rem;
-  }
-
-  .waiting-card {
-    text-align: center;
-    padding: 3rem;
-    color: var(--color-text-muted);
   }
 
   .loading {
