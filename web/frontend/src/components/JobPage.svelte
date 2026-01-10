@@ -33,7 +33,9 @@
     );
     let auditFailed = $state(initialJob.audit_failed);
     let auditError = $state<string | undefined>(initialJob.audit_error);
-    let agentModels = $state<Record<string, string>>({});
+    let agentModels = $state<Record<string, string>>(
+        initialJob.agent_models || {},
+    );
 
     function handleComplete(event: SSECompleteEvent) {
         isComplete = true;

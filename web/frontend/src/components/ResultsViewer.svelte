@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
-   * ResultsViewer.svelte - Tabbed results display
-   * Shows resume, cover letter, audit report, and intermediate results
+   * ResultsViewer.svelte - Gorgeous results display with TLDR summary
+   * Shows verdict, executive summary, resume, cover letter, and action items
    */
 
   import type { FinalDocuments, AuditReport } from "../lib/types";
@@ -25,75 +25,192 @@
     agentModels = {},
   }: Props = $props();
 
-  type Tab = "resume" | "cover_letter" | "audit" | "debug";
-  let activeTab = $state<Tab>("resume");
+  type Tab = "summary" | "resume" | "cover_letter" | "audit" | "debug";
+  let activeTab = $state<Tab>("summary");
 
   // Derived values
-  let hasDocuments = $derived(!!documents);
-  let auditStatus = $derived(auditReport?.final_status || "N/A");
-  let auditStatusClass = $derived(
-    auditStatus === "APPROVED"
-      ? "success"
-      : auditStatus === "REJECTED"
-        ? "warning"
-        : auditStatus === "AUDIT_CRASHED"
-          ? "error"
-          : "",
-  );
+  let hasDocuments = $derived(!!documents?.resume || !!documents?.cover_letter);
+  let auditStatus = $derived(auditReport?.final_status || "PENDING");
+
+  // Verdict mapping with more expressive labels
+  let verdict = $derived(() => {
+    if (auditFailed)
+      return { label: "NEEDS REVIEW", class: "warning", icon: "⚠️" };
+    switch (auditStatus) {
+      case "APPROVED":
+        return { label: "APPROVED", class: "success", icon: "✓" };
+      case "REJECTED":
+        return { label: "REJECTED", class: "error", icon: "✗" };
+      case "AUDIT_CRASHED":
+        return { label: "INCOMPLETE", class: "error", icon: "!" };
+      default:
+        return { label: "MIXED", class: "warning", icon: "◐" };
+    }
+  });
+
+  // Extract action items from audit report
+  let actionItems = $derived(() => {
+    const items: string[] = [];
+    if (auditError) items.push(auditError);
+    if (auditReport?.rejection_reason) items.push(auditReport.rejection_reason);
+    // Add generic recommendations
+    if (items.length === 0 && auditStatus === "APPROVED") {
+      items.push("Your documents are ready to submit!");
+      items.push(
+        "Consider updating your LinkedIn profile to match your tailored resume",
+      );
+      items.push(
+        "Review the cover letter for any personal touches you'd like to add",
+      );
+    }
+    return items;
+  });
+
+  // Generate executive summary from intermediate results
+  let executiveSummary = $derived(() => {
+    const summary: string[] = [];
+    const gapAnalysis = intermediateResults?.gap_analysis as
+      | Record<string, unknown>
+      | undefined;
+    const differentiation = intermediateResults?.differentiation as
+      | Record<string, unknown>
+      | undefined;
+
+    summary.push(
+      "**The Hydra team has completed your application materials.**",
+    );
+    summary.push("");
+
+    if (gapAnalysis) {
+      const gaps = (gapAnalysis.gaps as unknown[])?.length || 0;
+      const matches = (gapAnalysis.matches as unknown[])?.length || 0;
+      if (matches > 0 || gaps > 0) {
+        summary.push(
+          `📊 **Gap Analysis**: Found ${matches} skill matches and ${gaps} areas addressed through narrative framing.`,
+        );
+      }
+    }
+
+    if (differentiation) {
+      const differentiators =
+        (differentiation.differentiators as unknown[])?.length || 0;
+      if (differentiators > 0) {
+        summary.push(
+          `🎯 **Differentiation**: Identified ${differentiators} unique value propositions that set you apart.`,
+        );
+      }
+    }
+
+    summary.push("");
+    summary.push(
+      `🔍 **Audit Status**: ${auditStatus === "APPROVED" ? "All verification checks passed" : "Some items flagged for review"}`,
+    );
+
+    if (auditReport?.retry_count && auditReport.retry_count > 0) {
+      summary.push(
+        `🔄 **Refinements**: Documents were refined ${auditReport.retry_count} time(s) to meet quality standards.`,
+      );
+    }
+
+    return summary.join("\n");
+  });
 </script>
 
 <div class="results-viewer">
-  <!-- Status banner -->
-  {#if auditFailed}
-    <div class="status-banner warning">
-      <strong>Manual Review Required</strong>
-      <p>
-        {auditError || "Audit did not pass. Please review documents carefully."}
+  <!-- TLDR Hero Section -->
+  <div class="tldr-hero {verdict().class}">
+    <div class="verdict-badge">
+      <span class="verdict-icon">{verdict().icon}</span>
+      <span class="verdict-label">{verdict().label}</span>
+    </div>
+    <div class="tldr-title">
+      <h2>Your Application Materials Are Ready</h2>
+      <p class="tldr-subtitle">
+        {#if hasDocuments}
+          Hydra's 6-agent team has tailored your resume and cover letter for
+          this role.
+        {:else}
+          Processing encountered an issue. Check the audit report for details.
+        {/if}
       </p>
     </div>
-  {:else if auditStatus === "APPROVED"}
-    <div class="status-banner success">
-      <strong>Audit Passed</strong>
-      <p>Documents verified and ready to submit.</p>
-    </div>
-  {/if}
+  </div>
 
   <!-- Tab navigation -->
   <div class="tabs">
     <button
       class="tab"
+      class:active={activeTab === "summary"}
+      onclick={() => (activeTab = "summary")}
+    >
+      📋 Summary
+    </button>
+    <button
+      class="tab"
       class:active={activeTab === "resume"}
       onclick={() => (activeTab = "resume")}
     >
-      Resume
+      📄 Resume
     </button>
     <button
       class="tab"
       class:active={activeTab === "cover_letter"}
       onclick={() => (activeTab = "cover_letter")}
     >
-      Cover Letter
+      ✉️ Cover Letter
     </button>
     <button
       class="tab"
       class:active={activeTab === "audit"}
       onclick={() => (activeTab = "audit")}
     >
-      Audit Report
-      <span class="badge {auditStatusClass}">{auditStatus}</span>
+      🔍 Audit
+      <span class="badge {verdict().class}">{auditStatus}</span>
     </button>
     <button
       class="tab"
       class:active={activeTab === "debug"}
       onclick={() => (activeTab = "debug")}
     >
-      Debug
+      🐛 Debug
     </button>
   </div>
 
   <!-- Tab content -->
   <div class="tab-content">
-    {#if activeTab === "resume"}
+    {#if activeTab === "summary"}
+      <div class="summary-panel">
+        <div class="executive-summary">
+          <h3>Executive Summary</h3>
+          <MarkdownViewer content={executiveSummary()} />
+        </div>
+
+        {#if actionItems().length > 0}
+          <div class="action-items">
+            <h3>Next Steps</h3>
+            <ul>
+              {#each actionItems() as item}
+                <li>{item}</li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
+
+        {#if Object.keys(agentModels).length > 0}
+          <div class="agent-summary">
+            <h3>Agents Involved</h3>
+            <div class="agent-grid">
+              {#each Object.entries(agentModels) as [stage, model]}
+                <div class="agent-chip">
+                  <span class="agent-stage">{stage.replace(/_/g, " ")}</span>
+                  <span class="agent-model">{model.split("/").pop()}</span>
+                </div>
+              {/each}
+            </div>
+          </div>
+        {/if}
+      </div>
+    {:else if activeTab === "resume"}
       <div class="document-panel">
         <div class="document-header">
           <h3>Tailored Resume</h3>
@@ -102,12 +219,14 @@
               class="copy-btn"
               onclick={() => navigator.clipboard.writeText(documents.resume)}
             >
-              Copy
+              📋 Copy
             </button>
           {/if}
         </div>
         {#if documents?.resume}
-          <MarkdownViewer content={documents.resume} />
+          <div class="document-content">
+            <MarkdownViewer content={documents.resume} />
+          </div>
         {:else}
           <p class="empty">No resume generated.</p>
         {/if}
@@ -122,12 +241,14 @@
               onclick={() =>
                 navigator.clipboard.writeText(documents.cover_letter)}
             >
-              Copy
+              📋 Copy
             </button>
           {/if}
         </div>
         {#if documents?.cover_letter}
-          <MarkdownViewer content={documents.cover_letter} />
+          <div class="document-content">
+            <MarkdownViewer content={documents.cover_letter} />
+          </div>
         {:else}
           <p class="empty">No cover letter generated.</p>
         {/if}
@@ -139,7 +260,7 @@
           <div class="audit-summary">
             <div class="audit-stat">
               <span class="label">Status</span>
-              <span class="value {auditStatusClass}">{auditStatus}</span>
+              <span class="value {verdict().class}">{auditStatus}</span>
             </div>
             <div class="audit-stat">
               <span class="label">Retries</span>
@@ -156,27 +277,27 @@
 
           {#if auditReport.crash_error}
             <div class="audit-section error">
-              <h4>Crash Error</h4>
+              <h4>Error</h4>
               <p>{auditReport.crash_error}</p>
             </div>
           {/if}
 
           {#if auditReport.resume_audit}
-            <div class="audit-section">
-              <h4>Resume Audit</h4>
+            <details class="audit-details">
+              <summary>Resume Audit Details</summary>
               <pre>{JSON.stringify(auditReport.resume_audit, null, 2)}</pre>
-            </div>
+            </details>
           {/if}
 
           {#if auditReport.cover_letter_audit}
-            <div class="audit-section">
-              <h4>Cover Letter Audit</h4>
+            <details class="audit-details">
+              <summary>Cover Letter Audit Details</summary>
               <pre>{JSON.stringify(
                   auditReport.cover_letter_audit,
                   null,
                   2,
                 )}</pre>
-            </div>
+            </details>
           {/if}
         {:else}
           <p class="empty">No audit report available.</p>
@@ -189,9 +310,11 @@
           {#each Object.entries(intermediateResults) as [stage, result]}
             <details class="debug-section">
               <summary>
-                {stage}
+                {stage.replace(/_/g, " ")}
                 {#if agentModels[stage]}
-                  <span class="model-tag">{agentModels[stage]}</span>
+                  <span class="model-tag"
+                    >{agentModels[stage].split("/").pop()}</span
+                  >
                 {/if}
               </summary>
               <pre>{JSON.stringify(result, null, 2)}</pre>
@@ -213,31 +336,98 @@
     overflow: hidden;
   }
 
-  .status-banner {
-    padding: 1rem 1.5rem;
+  /* TLDR Hero Section */
+  .tldr-hero {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.5rem 2rem;
+    background: linear-gradient(
+      135deg,
+      rgba(59, 130, 246, 0.1) 0%,
+      rgba(147, 51, 234, 0.1) 100%
+    );
     border-bottom: 1px solid var(--color-border);
   }
 
-  .status-banner strong {
-    display: block;
-    margin-bottom: 0.25rem;
+  .tldr-hero.success {
+    background: linear-gradient(
+      135deg,
+      rgba(34, 197, 94, 0.15) 0%,
+      rgba(16, 185, 129, 0.1) 100%
+    );
   }
 
-  .status-banner p {
-    margin: 0;
-    opacity: 0.9;
+  .tldr-hero.warning {
+    background: linear-gradient(
+      135deg,
+      rgba(234, 179, 8, 0.15) 0%,
+      rgba(245, 158, 11, 0.1) 100%
+    );
   }
 
-  .status-banner.success {
-    background: rgba(34, 197, 94, 0.1);
+  .tldr-hero.error {
+    background: linear-gradient(
+      135deg,
+      rgba(239, 68, 68, 0.15) 0%,
+      rgba(220, 38, 38, 0.1) 100%
+    );
+  }
+
+  .verdict-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    border-radius: 12px;
+    background: var(--color-bg);
+    border: 2px solid var(--color-border);
+    flex-shrink: 0;
+  }
+
+  .tldr-hero.success .verdict-badge {
+    border-color: var(--color-success);
     color: var(--color-success);
   }
 
-  .status-banner.warning {
-    background: rgba(234, 179, 8, 0.1);
+  .tldr-hero.warning .verdict-badge {
+    border-color: var(--color-warning);
     color: var(--color-warning);
   }
 
+  .tldr-hero.error .verdict-badge {
+    border-color: var(--color-error);
+    color: var(--color-error);
+  }
+
+  .verdict-icon {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  .verdict-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.25rem;
+  }
+
+  .tldr-title h2 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.3rem;
+    color: var(--color-text);
+  }
+
+  .tldr-subtitle {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 0.95rem;
+  }
+
+  /* Tabs */
   .tabs {
     display: flex;
     border-bottom: 1px solid var(--color-border);
@@ -248,16 +438,17 @@
   .tab {
     background: transparent;
     border: none;
-    padding: 1rem 1.5rem;
+    padding: 0.85rem 1.25rem;
     color: var(--color-text-muted);
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 500;
     border-bottom: 2px solid transparent;
     white-space: nowrap;
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    transition: all 0.2s;
   }
 
   .tab:hover {
@@ -271,7 +462,7 @@
   }
 
   .badge {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     padding: 0.15rem 0.4rem;
     border-radius: 3px;
     background: var(--color-bg-secondary);
@@ -281,12 +472,10 @@
     background: rgba(34, 197, 94, 0.2);
     color: var(--color-success);
   }
-
   .badge.warning {
     background: rgba(234, 179, 8, 0.2);
     color: var(--color-warning);
   }
-
   .badge.error {
     background: rgba(239, 68, 68, 0.2);
     color: var(--color-error);
@@ -297,9 +486,68 @@
     min-height: 400px;
   }
 
-  .document-panel,
-  .audit-panel,
-  .debug-panel {
+  /* Summary Panel */
+  .summary-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .executive-summary,
+  .action-items,
+  .agent-summary {
+    background: var(--color-bg);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+  }
+
+  .executive-summary h3,
+  .action-items h3,
+  .agent-summary h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    color: var(--color-text);
+  }
+
+  .action-items ul {
+    margin: 0;
+    padding-left: 1.5rem;
+  }
+
+  .action-items li {
+    margin-bottom: 0.5rem;
+    color: var(--color-text-muted);
+  }
+
+  .agent-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .agent-chip {
+    display: flex;
+    flex-direction: column;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .agent-stage {
+    font-size: 0.7rem;
+    text-transform: capitalize;
+    color: var(--color-text-muted);
+  }
+
+  .agent-model {
+    font-size: 0.75rem;
+    font-family: monospace;
+    color: var(--color-primary);
+  }
+
+  /* Document Panel */
+  .document-panel {
     max-height: 600px;
     overflow-y: auto;
   }
@@ -318,11 +566,32 @@
   .copy-btn {
     padding: 0.5rem 1rem;
     font-size: 0.8rem;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .copy-btn:hover {
+    background: var(--color-bg-secondary);
+  }
+
+  .document-content {
+    background: var(--color-bg);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    line-height: 1.6;
   }
 
   .empty {
     color: var(--color-text-muted);
     font-style: italic;
+  }
+
+  /* Audit Panel */
+  .audit-panel {
+    max-height: 600px;
+    overflow-y: auto;
   }
 
   .audit-summary {
@@ -338,8 +607,9 @@
   }
 
   .audit-stat .label {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--color-text-muted);
+    text-transform: uppercase;
   }
 
   .audit-stat .value {
@@ -350,11 +620,9 @@
   .audit-stat .value.success {
     color: var(--color-success);
   }
-
   .audit-stat .value.warning {
     color: var(--color-warning);
   }
-
   .audit-stat .value.error {
     color: var(--color-error);
   }
@@ -367,24 +635,41 @@
   }
 
   .audit-section h4 {
-    margin-top: 0;
-    margin-bottom: 0.5rem;
+    margin: 0 0 0.5rem 0;
     font-size: 0.9rem;
-  }
-
-  .audit-section pre {
-    margin: 0;
-    font-size: 0.8rem;
-    overflow-x: auto;
-    color: var(--color-text-muted);
   }
 
   .audit-section.warning {
     border-left: 3px solid var(--color-warning);
   }
-
   .audit-section.error {
     border-left: 3px solid var(--color-error);
+  }
+
+  .audit-details {
+    background: var(--color-bg);
+    border-radius: var(--radius);
+    margin-bottom: 0.5rem;
+  }
+
+  .audit-details summary {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .audit-details pre {
+    padding: 0 1rem 1rem;
+    margin: 0;
+    font-size: 0.75rem;
+    overflow-x: auto;
+    color: var(--color-text-muted);
+  }
+
+  /* Debug Panel */
+  .debug-panel {
+    max-height: 600px;
+    overflow-y: auto;
   }
 
   .debug-section {
@@ -397,6 +682,7 @@
     padding: 0.75rem 1rem;
     cursor: pointer;
     font-weight: 500;
+    text-transform: capitalize;
     display: flex;
     justify-content: space-between;
     align-items: center;
