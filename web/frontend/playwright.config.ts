@@ -57,7 +57,7 @@ export default defineConfig({
     webServer: [
         {
             command: 'cd ../.. && ./web/run.sh backend',
-            url: 'http://localhost:8000/api/health',
+            url: 'http://localhost:8000/health',
             reuseExistingServer: !process.env.CI,
             timeout: 30000,
         },
