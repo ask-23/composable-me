@@ -4,12 +4,17 @@
    * Shows verdict, executive summary, resume, cover letter, and action items
    */
 
-  import type { FinalDocuments, AuditReport } from "../lib/types";
+  import type {
+    FinalDocuments,
+    AuditReport,
+    ExecutiveBrief,
+  } from "../lib/types";
   import MarkdownViewer from "./MarkdownViewer.svelte";
 
   interface Props {
     documents?: FinalDocuments;
     auditReport?: AuditReport;
+    executiveBrief?: ExecutiveBrief;
     intermediateResults?: Record<string, unknown>;
     auditFailed?: boolean;
     auditError?: string;
@@ -19,6 +24,7 @@
   let {
     documents,
     auditReport,
+    executiveBrief,
     intermediateResults,
     auditFailed = false,
     auditError,
@@ -32,8 +38,24 @@
   let hasDocuments = $derived(!!documents?.resume || !!documents?.cover_letter);
   let auditStatus = $derived(auditReport?.final_status || "PENDING");
 
-  // Verdict mapping with more expressive labels
+  // Verdict mapping - prioritize executive brief recommendation
   let verdict = $derived(() => {
+    // Use executive brief recommendation if available
+    if (executiveBrief?.decision?.recommendation) {
+      const rec = executiveBrief.decision.recommendation;
+      switch (rec) {
+        case "STRONG_PROCEED":
+          return { label: "STRONG PROCEED", class: "success", icon: "🚀" };
+        case "PROCEED":
+          return { label: "PROCEED", class: "success", icon: "✓" };
+        case "PROCEED_WITH_CAUTION":
+          return { label: "CAUTION", class: "warning", icon: "⚠️" };
+        case "PASS":
+          return { label: "PASS", class: "error", icon: "✗" };
+      }
+    }
+
+    // Fallback to audit status
     if (auditFailed)
       return { label: "NEEDS REVIEW", class: "warning", icon: "⚠️" };
     switch (auditStatus) {
@@ -48,27 +70,77 @@
     }
   });
 
-  // Extract action items from audit report
+  // Extract action items from executive brief or audit report
   let actionItems = $derived(() => {
     const items: string[] = [];
+
+    // Use executive brief action items if available
+    if (executiveBrief?.action_items?.immediate) {
+      items.push(...executiveBrief.action_items.immediate);
+    }
+
+    // Add fallbacks
     if (auditError) items.push(auditError);
     if (auditReport?.rejection_reason) items.push(auditReport.rejection_reason);
-    // Add generic recommendations
+
+    // Add generic recommendations if nothing else
     if (items.length === 0 && auditStatus === "APPROVED") {
       items.push("Your documents are ready to submit!");
       items.push(
         "Consider updating your LinkedIn profile to match your tailored resume",
       );
-      items.push(
-        "Review the cover letter for any personal touches you'd like to add",
-      );
     }
     return items;
   });
 
-  // Generate executive summary from intermediate results
+  // Generate executive summary from executive brief or intermediate results
   let executiveSummary = $derived(() => {
     const summary: string[] = [];
+
+    // Use executive brief if available
+    if (executiveBrief?.decision) {
+      const decision = executiveBrief.decision;
+      const fitScore = decision.fit_score || 0;
+
+      summary.push(`## ${decision.recommendation?.replace(/_/g, " ")}`);
+      summary.push("");
+      summary.push(`**Fit Score**: ${fitScore}%`);
+      summary.push("");
+
+      if (decision.rationale) {
+        summary.push(decision.rationale);
+        summary.push("");
+      }
+
+      if (executiveBrief.strategic_angle?.primary_hook) {
+        summary.push(
+          `🎯 **Your Hook**: "${executiveBrief.strategic_angle.primary_hook}"`,
+        );
+        summary.push("");
+      }
+
+      if (decision.deal_makers && decision.deal_makers.length > 0) {
+        summary.push("✅ **Deal Makers**:");
+        for (const maker of decision.deal_makers) {
+          summary.push(`- ${maker}`);
+        }
+        summary.push("");
+      }
+
+      if (
+        executiveBrief.gap_strategy?.critical_gaps &&
+        executiveBrief.gap_strategy.critical_gaps.length > 0
+      ) {
+        summary.push("⚠️ **Gaps to Address**:");
+        for (const gap of executiveBrief.gap_strategy.critical_gaps) {
+          summary.push(`- **${gap.gap}**: ${gap.mitigation}`);
+        }
+      }
+
+      return summary.join("\n");
+    }
+
+    // Fallback to intermediate results analysis
     const gapAnalysis = intermediateResults?.gap_analysis as
       | Record<string, unknown>
       | undefined;

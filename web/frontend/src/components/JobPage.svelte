@@ -11,6 +11,7 @@
         SSECompleteEvent,
         FinalDocuments,
         AuditReport,
+        ExecutiveBrief,
     } from "../lib/types";
 
     interface Props {
@@ -28,6 +29,9 @@
         initialJob.final_documents,
     );
     let auditReport = $state<AuditReport | undefined>(initialJob.audit_report);
+    let executiveBrief = $state<ExecutiveBrief | undefined>(
+        initialJob.executive_brief,
+    );
     let intermediateResults = $state<Record<string, unknown>>(
         initialJob.intermediate_results || {},
     );
@@ -41,6 +45,7 @@
         isComplete = true;
         finalDocuments = event.final_documents;
         auditReport = event.audit_report;
+        executiveBrief = event.executive_brief;
         auditFailed = event.audit_failed;
         auditError = event.audit_error;
         agentModels = event.agent_models || {};
@@ -73,6 +78,7 @@
         <ResultsViewer
             documents={finalDocuments}
             {auditReport}
+            {executiveBrief}
             {intermediateResults}
             {auditFailed}
             {auditError}

@@ -64,6 +64,7 @@ def _run_workflow_sync(job: Job) -> None:
         job.completed_at = datetime.now()
         job.final_documents = result.final_documents
         job.audit_report = result.audit_report
+        job.executive_brief = getattr(result, "executive_brief", None)
         job.intermediate_results = result.intermediate_results or {}
         job.execution_log = result.execution_log or []
         job.error_message = result.error_message
@@ -210,6 +211,7 @@ async def run_workflow_async(job: Job) -> None:
         job.completed_at = datetime.now()
         job.final_documents = result.final_documents
         job.audit_report = result.audit_report
+        job.executive_brief = getattr(result, "executive_brief", None)
         job.intermediate_results = result.intermediate_results or {}
         job.execution_log = result.execution_log or []
         job.error_message = result.error_message
@@ -226,6 +228,7 @@ async def run_workflow_async(job: Job) -> None:
             "state": job.state.value,
             "final_documents": job.final_documents,
             "audit_report": job.audit_report,
+            "executive_brief": job.executive_brief,
             "audit_failed": job.audit_failed,
             "audit_error": job.audit_error,
             "error_message": job.error_message,

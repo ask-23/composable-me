@@ -25,7 +25,9 @@ from runtime.crewai.agents.differentiator import DifferentiatorAgent
 from runtime.crewai.agents.tailoring_agent import TailoringAgent
 from runtime.crewai.agents.ats_optimizer import ATSOptimizerAgent
 from runtime.crewai.agents.auditor import AuditorSuiteAgent
+from runtime.crewai.agents.executive_synthesizer import ExecutiveSynthesizerAgent
 from runtime.crewai.base_agent import ValidationError
+from runtime.crewai.model_config import get_llm_for_agent, get_agent_model_info, LLMClientError
 
 
 class WorkflowState(Enum):
@@ -37,6 +39,7 @@ class WorkflowState(Enum):
     TAILORING = "tailoring"
     ATS_OPTIMIZATION = "ats_optimization"
     AUDITING = "auditing"
+    EXECUTIVE_SYNTHESIS = "executive_synthesis"
     COMPLETED = "completed"
     FAILED = "failed"
 
@@ -48,9 +51,9 @@ class WorkflowResult:
     success: bool
     final_documents: Optional[Dict[str, Any]] = None
     audit_report: Optional[Dict[str, Any]] = None
+    executive_brief: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
     execution_log: List[str] = None
-    # New fields for partial results on failure
     intermediate_results: Optional[Dict[str, Any]] = None
     audit_failed: bool = False
     audit_error: Optional[str] = None
@@ -60,38 +63,80 @@ class WorkflowResult:
 class HydraWorkflow:
     """Orchestrates the complete Composable Me agent pipeline"""
     
-    def __init__(self, llm: LLM, max_audit_retries: int = 2):
+    def __init__(self, llm: LLM = None, max_audit_retries: int = 2, use_per_agent_models: bool = True):
         """
         Initialize the workflow with all agents
         
         Args:
-            llm: The LLM instance to use for all agents
+            llm: Optional fallback LLM instance (used if per-agent models fail)
             max_audit_retries: Maximum number of audit retry attempts
+            use_per_agent_models: If True, use optimized models per agent
         """
-        self.llm = llm
+        self.fallback_llm = llm
         self.max_audit_retries = max_audit_retries
+        self.use_per_agent_models = use_per_agent_models
         self.logger = logging.getLogger(__name__)
         
-        # Initialize all agents
-        self.gap_analyzer = GapAnalyzerAgent(llm)
-        self.interrogator_prepper = InterrogatorPrepperAgent(llm)
-        self.differentiator = DifferentiatorAgent(llm)
-        self.tailoring_agent = TailoringAgent(llm)
-        self.ats_optimizer = ATSOptimizerAgent(llm)
-        self.auditor_suite = AuditorSuiteAgent(llm)
+        # Initialize agents with per-agent model assignments
+        self.agent_models = {}
+        
+        # Gap Analyzer - DeepSeek V3 TEE (Chutes) or fallback
+        gap_llm = self._get_agent_llm("gap_analyzer")
+        self.gap_analyzer = GapAnalyzerAgent(gap_llm)
+        
+        # Interrogator - Llama 3.3 (Together)
+        interrogator_llm = self._get_agent_llm("interrogator_prepper")
+        self.interrogator_prepper = InterrogatorPrepperAgent(interrogator_llm)
+        
+        # Differentiator - Claude Sonnet 4 (Anthropic)
+        differentiator_llm = self._get_agent_llm("differentiator")
+        self.differentiator = DifferentiatorAgent(differentiator_llm)
+        
+        # Tailoring Agent - Claude Sonnet 4 (Anthropic)
+        tailoring_llm = self._get_agent_llm("tailoring_agent")
+        self.tailoring_agent = TailoringAgent(tailoring_llm)
+        
+        # ATS Optimizer - Llama 3.3 (Together)
+        ats_llm = self._get_agent_llm("ats_optimizer")
+        self.ats_optimizer = ATSOptimizerAgent(ats_llm)
+        
+        # Auditor Suite - DeepSeek R1 TEE (Chutes) or fallback
+        auditor_llm = self._get_agent_llm("auditor_suite")
+        self.auditor_suite = AuditorSuiteAgent(auditor_llm)
+        
+        # Executive Synthesizer - Claude Sonnet/Opus (Anthropic)
+        exec_llm = self._get_agent_llm("executive_synthesizer")
+        self.executive_synthesizer = ExecutiveSynthesizerAgent(exec_llm)
         
         # Workflow state
         self.current_state = WorkflowState.INITIALIZED
         self.execution_log = []
         self.intermediate_results = {}
-        self.agent_models = {
-            "gap_analysis": llm.model,
-            "interrogation": llm.model,
-            "differentiation": llm.model,
-            "tailoring": llm.model,
-            "ats_optimization": llm.model,
-            "auditing": llm.model
-        }
+    
+    def _get_agent_llm(self, agent_type: str) -> LLM:
+        """Get LLM for an agent, falling back if needed."""
+        if self.use_per_agent_models:
+            try:
+                llm = get_llm_for_agent(agent_type)
+                model_info = get_agent_model_info(agent_type)
+                self.agent_models[agent_type] = model_info.get("model", "unknown")
+                self.logger.info(f"Agent '{agent_type}' using model: {model_info.get('model')}")
+                return llm
+            except LLMClientError as e:
+                self.logger.warning(f"Per-agent model failed for '{agent_type}': {e}")
+        
+        # Use fallback
+        if self.fallback_llm:
+            self.agent_models[agent_type] = getattr(self.fallback_llm, 'model', 'fallback')
+            return self.fallback_llm
+        
+        # Try to get any working model
+        try:
+            llm = get_llm_for_agent(agent_type, fallback_only=True)
+            self.agent_models[agent_type] = "fallback"
+            return llm
+        except LLMClientError:
+            raise ValueError(f"No LLM available for agent '{agent_type}'")
     
     def execute(self, context: Dict[str, Any]) -> WorkflowResult:
         """
@@ -124,6 +169,17 @@ class HydraWorkflow:
             # Execute audit with retry loop (no longer throws exceptions)
             final_result = self._execute_audit_with_retry(context, ats_result)
 
+            # Execute executive synthesis to create strategic brief
+            executive_brief = self._execute_executive_synthesis(
+                context, 
+                gap_result, 
+                interrogation_result, 
+                differentiation_result,
+                tailoring_result,
+                ats_result,
+                final_result
+            )
+
             # Determine final state based on audit result
             audit_failed = final_result.get("audit_failed", False)
             audit_status = final_result.get("audit_report", {}).get("final_status", "UNKNOWN")
@@ -140,6 +196,7 @@ class HydraWorkflow:
                 success=True,  # Documents were generated, even if audit failed
                 final_documents=final_result.get("final_documents"),
                 audit_report=final_result.get("audit_report"),
+                executive_brief=executive_brief,
                 execution_log=self.execution_log.copy(),
                 intermediate_results=self.get_intermediate_results(),
                 audit_failed=audit_failed,
@@ -385,6 +442,50 @@ class HydraWorkflow:
             "audit_failed": True,
             "audit_error": last_error or "Unknown error in audit retry loop"
         }
+
+    def _execute_executive_synthesis(
+        self, 
+        context: Dict[str, Any],
+        gap_result: Dict[str, Any],
+        interrogation_result: Dict[str, Any],
+        differentiation_result: Dict[str, Any],
+        tailoring_result: Dict[str, Any],
+        ats_result: Dict[str, Any],
+        audit_result: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Execute executive synthesis to create strategic brief"""
+        self.current_state = WorkflowState.EXECUTIVE_SYNTHESIS
+        self._log("Executing Executive Synthesis")
+        
+        try:
+            synthesis_context = {
+                "job_description": context.get("job_description", ""),
+                "resume": context.get("resume", ""),
+                "gap_analysis": gap_result,
+                "interview_notes": interrogation_result,
+                "differentiation": differentiation_result,
+                "tailored_resume": tailoring_result.get("tailored_resume", ""),
+                "tailored_cover_letter": tailoring_result.get("tailored_cover_letter", ""),
+                "ats_optimization": ats_result,
+                "audit_report": audit_result.get("audit_report", {}),
+            }
+            
+            result = self.executive_synthesizer.execute(synthesis_context)
+            self.intermediate_results["executive_synthesis"] = result
+            self._log(f"Executive synthesis complete: {result.get('decision', {}).get('recommendation', 'UNKNOWN')}")
+            return result
+            
+        except Exception as e:
+            self._log(f"Executive synthesis failed: {str(e)}")
+            # Return a minimal brief on failure
+            return {
+                "decision": {
+                    "recommendation": "PROCEED",
+                    "fit_score": 0,
+                    "rationale": f"Executive synthesis failed: {str(e)}",
+                },
+                "error": str(e)
+            }
 
     def _apply_audit_fixes(self, documents: Dict[str, str], resume_audit: Dict[str, Any],
                           cover_letter_audit: Optional[Dict[str, Any]]) -> Dict[str, str]:
