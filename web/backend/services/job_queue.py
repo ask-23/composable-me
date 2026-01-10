@@ -30,6 +30,7 @@ class Job:
     # Results
     final_documents: Optional[dict[str, str]] = None
     audit_report: Optional[dict[str, Any]] = None
+    executive_brief: Optional[dict[str, Any]] = None
     intermediate_results: dict[str, Any] = field(default_factory=dict)
     execution_log: list[str] = field(default_factory=list)
     error_message: Optional[str] = None

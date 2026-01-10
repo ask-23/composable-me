@@ -88,6 +88,7 @@ class JobsController(Controller):
             completed_at=job.completed_at,
             final_documents=final_docs,
             audit_report=audit_report,
+            executive_brief=job.executive_brief,
             intermediate_results=job.intermediate_results,
             execution_log=job.execution_log,
             error_message=job.error_message,

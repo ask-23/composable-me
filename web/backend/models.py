@@ -69,6 +69,7 @@ class JobResponse(BaseModel):
     completed_at: Optional[datetime] = None
     final_documents: Optional[FinalDocuments] = None
     audit_report: Optional[AuditReport] = None
+    executive_brief: Optional[dict[str, Any]] = Field(default=None, description="Strategic executive brief")
     intermediate_results: Optional[dict[str, Any]] = None
     execution_log: list[str] = Field(default_factory=list)
     error_message: Optional[str] = None
