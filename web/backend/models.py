@@ -74,6 +74,7 @@ class JobResponse(BaseModel):
     error_message: Optional[str] = None
     audit_failed: bool = False
     audit_error: Optional[str] = None
+    agent_models: Optional[dict[str, str]] = Field(default=None, description="Models used by each agent")
 
 
 class SSEEvent(BaseModel):

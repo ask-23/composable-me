@@ -54,6 +54,7 @@ class WorkflowResult:
     intermediate_results: Optional[Dict[str, Any]] = None
     audit_failed: bool = False
     audit_error: Optional[str] = None
+    agent_models: Optional[Dict[str, str]] = None
 
 
 class HydraWorkflow:
@@ -83,6 +84,14 @@ class HydraWorkflow:
         self.current_state = WorkflowState.INITIALIZED
         self.execution_log = []
         self.intermediate_results = {}
+        self.agent_models = {
+            "gap_analysis": llm.model,
+            "interrogation": llm.model,
+            "differentiation": llm.model,
+            "tailoring": llm.model,
+            "ats_optimization": llm.model,
+            "auditing": llm.model
+        }
     
     def execute(self, context: Dict[str, Any]) -> WorkflowResult:
         """
@@ -134,7 +143,8 @@ class HydraWorkflow:
                 execution_log=self.execution_log.copy(),
                 intermediate_results=self.get_intermediate_results(),
                 audit_failed=audit_failed,
-                audit_error=final_result.get("audit_error")
+                audit_error=final_result.get("audit_error"),
+                agent_models=self.agent_models
             )
 
         except Exception as e:
@@ -147,7 +157,8 @@ class HydraWorkflow:
                 success=False,
                 error_message=error_msg,
                 execution_log=self.execution_log.copy(),
-                intermediate_results=self.get_intermediate_results()  # Include partial results on failure
+                intermediate_results=self.get_intermediate_results(),  # Include partial results on failure
+                agent_models=self.agent_models
             )
     
     def _validate_input_context(self, context: Dict[str, Any]) -> None:

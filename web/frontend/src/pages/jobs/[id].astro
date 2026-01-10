@@ -64,6 +64,7 @@ const isComplete = job?.state === 'completed' || job?.state === 'failed';
               intermediateResults={job.intermediate_results}
               auditFailed={job.audit_failed}
               auditError={job.audit_error}
+              agentModels={job.agent_models}
             />
           </div>
         ) : (

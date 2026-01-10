@@ -26,6 +26,7 @@
   let error = $state<string | null>(null);
   let isConnected = $state(false);
   let elapsedSeconds = $state(0);
+  let agent_models = $state<Record<string, string>>({});
 
   // Timer for elapsed time
   let timerInterval: ReturnType<typeof setInterval> | null = null;
@@ -98,6 +99,7 @@
       const data: SSECompleteEvent = JSON.parse(e.data);
       state = data.state as JobState;
       progress = 100;
+      if (data.agent_models) agent_models = data.agent_models;
 
       // Capture error message if job failed
       if (data.state === "failed" && data.error_message) {
@@ -233,7 +235,12 @@
         {/if}
       </div>
       <div class="agent-title">
-        <h3>{stageInfo.agentName}</h3>
+        <div class="agent-title-row">
+          <h3>{stageInfo.agentName}</h3>
+          {#if agent_models[state]}
+            <span class="model-badge">{agent_models[state]}</span>
+          {/if}
+        </div>
         <p class="agent-status">{stageInfo.description}</p>
       </div>
     </div>
@@ -494,10 +501,27 @@
     }
   }
 
+  .agent-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.25rem;
+  }
+
   .agent-title h3 {
-    margin: 0 0 0.25rem 0;
+    margin: 0;
     font-size: 1.1rem;
     color: var(--color-primary);
+  }
+
+  .model-badge {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+    font-family: monospace;
   }
 
   .agent-card.success .agent-title h3 {
