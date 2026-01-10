@@ -125,7 +125,7 @@ async def run_workflow_async(job: Job) -> None:
     """
     Run HydraWorkflow asynchronously with progress updates.
 
-    This wraps the sync workflow execution and polls for state changes.
+    This runs the sync workflow in a thread pool while polling for state changes.
     """
     job.started_at = datetime.now()
     job.state = JobState.INITIALIZED
@@ -140,8 +140,84 @@ async def run_workflow_async(job: Job) -> None:
     loop = asyncio.get_event_loop()
 
     try:
-        # Run blocking workflow in thread pool
-        await loop.run_in_executor(_executor, _run_workflow_sync, job)
+        # Initialize LLM client
+        llm = get_llm_client(model=job.model)
+        
+        # Create workflow
+        workflow = HydraWorkflow(llm, max_audit_retries=job.max_audit_retries)
+        
+        # Store agent_models immediately so it's available
+        job.agent_models = workflow.agent_models
+
+        # Build context
+        context = {
+            "job_description": job.job_description,
+            "resume": job.resume,
+            "source_documents": job.source_documents,
+        }
+
+        # Create a future for the workflow execution
+        def run_workflow():
+            return workflow.execute(context)
+
+        future = loop.run_in_executor(_executor, run_workflow)
+
+        # Poll for state changes while workflow runs
+        last_state = None
+        last_log_length = 0
+        
+        while not future.done():
+            await asyncio.sleep(0.5)  # Poll twice per second for responsiveness
+            
+            # Get current state from workflow
+            current_state = _map_workflow_state(workflow.get_current_state())
+            
+            # Emit state change event
+            if current_state != last_state:
+                last_state = current_state
+                job.state = current_state
+                await job.emit_event("progress", {
+                    "state": current_state.value,
+                    "progress": job.get_progress_percent(),
+                    "agent_models": job.agent_models,
+                })
+
+            # Emit new log entries
+            current_log = workflow.get_execution_log()
+            if len(current_log) > last_log_length:
+                new_entries = current_log[last_log_length:]
+                last_log_length = len(current_log)
+                job.execution_log = current_log
+                for entry in new_entries:
+                    await job.emit_event("log", {"message": entry})
+
+            # Emit intermediate results
+            intermediate = workflow.get_intermediate_results()
+            for stage, result in intermediate.items():
+                if stage not in job.intermediate_results:
+                    job.intermediate_results[stage] = result
+                    await job.emit_event("stage_complete", {
+                        "stage": stage,
+                        "result": result,
+                    })
+
+        # Get the result from the future
+        result = future.result()
+
+        # Update job with results
+        job.state = _map_workflow_state(result.state)
+        job.success = result.success
+        job.completed_at = datetime.now()
+        job.final_documents = result.final_documents
+        job.audit_report = result.audit_report
+        job.intermediate_results = result.intermediate_results or {}
+        job.execution_log = result.execution_log or []
+        job.error_message = result.error_message
+        job.audit_failed = getattr(result, "audit_failed", False)
+        job.audit_error = getattr(result, "audit_error", None)
+        job.agent_models = result.agent_models or {}
+
+        logger.info(f"Job {job.id} completed: success={job.success}, state={job.state}")
 
         # Emit completion event
         await job.emit_event("complete", {
