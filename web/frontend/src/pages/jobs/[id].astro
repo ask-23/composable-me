@@ -1,0 +1,159 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import JobProgress from '../../components/JobProgress.svelte';
+import ResultsViewer from '../../components/ResultsViewer.svelte';
+import type { Job } from '../../lib/types';
+
+const { id } = Astro.params;
+
+// Fetch initial job state from backend
+const BACKEND_URL = import.meta.env.BACKEND_URL || 'http://localhost:8000';
+let job: Job | null = null;
+let error: string | null = null;
+
+try {
+  const response = await fetch(`${BACKEND_URL}/api/jobs/${id}`);
+  if (response.ok) {
+    job = await response.json();
+  } else if (response.status === 404) {
+    error = 'Job not found';
+  } else {
+    error = `Failed to load job: HTTP ${response.status}`;
+  }
+} catch (e) {
+  error = 'Failed to connect to backend. Is the API server running?';
+}
+
+const isComplete = job?.state === 'completed' || job?.state === 'failed';
+---
+
+<Layout title={`Job ${id?.slice(0, 8)}...`}>
+  <div class="job-page">
+    <header class="job-header">
+      <a href="/" class="back-link">&larr; New Job</a>
+      <h1>Job Progress</h1>
+      <p class="job-id">ID: {id}</p>
+    </header>
+
+    {error && (
+      <div class="error card">
+        <h2>Error</h2>
+        <p>{error}</p>
+        <a href="/">Go back to upload</a>
+      </div>
+    )}
+
+    {!error && job && (
+      <Fragment>
+        <!-- Progress tracker (client-side for live updates) -->
+        <div class="card progress-card">
+          <JobProgress
+            client:load
+            jobId={id!}
+            initialState={job.state}
+          />
+        </div>
+
+        <!-- Results viewer (shown when complete) -->
+        {isComplete ? (
+          <div class="results-section">
+            <ResultsViewer
+              client:visible
+              documents={job.final_documents}
+              auditReport={job.audit_report}
+              intermediateResults={job.intermediate_results}
+              auditFailed={job.audit_failed}
+              auditError={job.audit_error}
+            />
+          </div>
+        ) : (
+          <div class="waiting-card card">
+            <p>Results will appear here when processing completes...</p>
+          </div>
+        )}
+      </Fragment>
+    )}
+
+    {!error && !job && (
+      <div class="loading card">
+        <p>Loading job status...</p>
+      </div>
+    )}
+  </div>
+</Layout>
+
+<script>
+  // Client-side: Listen for completion to show results
+  document.addEventListener('DOMContentLoaded', () => {
+    // The JobProgress component will emit events when complete
+    // Results viewer will be hydrated when scrolled into view
+  });
+</script>
+
+<style>
+  .job-page {
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+
+  .job-header {
+    margin-bottom: 2rem;
+  }
+
+  .back-link {
+    display: inline-block;
+    margin-bottom: 1rem;
+    color: var(--color-text-muted);
+    text-decoration: none;
+    font-size: 0.9rem;
+  }
+
+  .back-link:hover {
+    color: var(--color-primary);
+  }
+
+  .job-header h1 {
+    margin-bottom: 0.25rem;
+  }
+
+  .job-id {
+    color: var(--color-text-muted);
+    font-family: monospace;
+    font-size: 0.9rem;
+  }
+
+  .progress-card {
+    margin-bottom: 2rem;
+  }
+
+  .results-section {
+    margin-top: 2rem;
+  }
+
+  .waiting-card {
+    text-align: center;
+    padding: 3rem;
+    color: var(--color-text-muted);
+  }
+
+  .loading {
+    text-align: center;
+    padding: 3rem;
+    color: var(--color-text-muted);
+  }
+
+  .error {
+    text-align: center;
+    background: rgba(239, 68, 68, 0.1);
+    border-color: var(--color-error);
+  }
+
+  .error h2 {
+    color: var(--color-error);
+    margin-bottom: 0.5rem;
+  }
+
+  .error p {
+    margin-bottom: 1rem;
+  }
+</style>

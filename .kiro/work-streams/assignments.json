@@ -1,0 +1,74 @@
+{
+  "project": "Composable Crew",
+  "created": "2024-12-05T22:50:00Z",
+  "streams": {
+    "stream-a-kiro": {
+      "agent": "Kiro",
+      "role": "Orchestrator & Integration Lead",
+      "status": "in_progress",
+      "tasks": [
+        "Project structure setup",
+        "Work stream coordination system",
+        "Integration framework",
+        "Testing coordination",
+        "Final assembly"
+      ]
+    },
+    "stream-b-claude": {
+      "agent": "Claude",
+      "role": "Commander Agent Implementation",
+      "status": "not_started",
+      "tasks": [
+        "Commander agent prompt refinement",
+        "Workflow orchestration logic",
+        "Greenlight handling",
+        "Error handling and retry logic"
+      ]
+    },
+    "stream-c-codex": {
+      "agent": "Codex",
+      "role": "Gap Analyzer Implementation",
+      "status": "not_started",
+      "tasks": [
+        "Gap Analyzer agent",
+        "Requirement mapping logic",
+        "Fit scoring algorithm",
+        "Classification logic (direct/adjacent/gap/blocker)"
+      ]
+    },
+    "stream-d-augment": {
+      "agent": "Augment",
+      "role": "Interrogator-Prepper Implementation",
+      "status": "not_started",
+      "tasks": [
+        "Interrogator-Prepper agent",
+        "STAR+ question generation",
+        "Gap-based question targeting",
+        "Interview note processing"
+      ]
+    },
+    "stream-e-assistant": {
+      "agent": "Assistant",
+      "role": "Differentiator & Tailoring Agents",
+      "status": "not_started",
+      "tasks": [
+        "Differentiator agent",
+        "Tailoring agent",
+        "Resume generation",
+        "Cover letter generation"
+      ]
+    },
+    "stream-f-assistant": {
+      "agent": "Assistant",
+      "role": "ATS Optimizer & Auditor Suite",
+      "status": "not_started",
+      "tasks": [
+        "ATS Optimizer agent",
+        "Auditor Suite agent",
+        "Truth audit logic",
+        "Tone audit logic",
+        "Compliance checks"
+      ]
+    }
+  }
+}

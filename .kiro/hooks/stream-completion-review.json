@@ -1,0 +1,34 @@
+{
+  "name": "Stream Completion Review",
+  "description": "Automatically trigger Kiro to review completed work when DONE.md is created",
+  "version": "1.0.0",
+  "enabled": true,
+  "trigger": {
+    "type": "file_created",
+    "pattern": ".kiro/work-streams/*/completed/DONE.md",
+    "description": "Trigger when any stream creates their DONE.md completion summary"
+  },
+  "action": {
+    "type": "agent_message",
+    "agent": "kiro",
+    "message": "Review and validate the completed work for {stream_name}:\n\n1. Read {stream_path}/completed/DONE.md to understand what was built\n2. Check that all deliverables exist in {stream_path}/completed/\n3. Run tests: .venv/bin/pytest tests/unit/test_{agent_name}.py -v\n4. Verify all tests pass\n5. Check code quality and adherence to requirements\n6. Validate YAML output format matches interface spec\n7. If issues found, create {stream_path}/integration-issues.md with specific fixes needed\n8. If satisfied, integrate code into main codebase and mark stream as complete\n9. Update {stream_path}/status.json to reflect review status\n10. Notify dependent streams if this unblocks them",
+    "context": {
+      "stream_path": "{{file_directory}}",
+      "stream_name": "{{stream_directory_name}}",
+      "done_file": "{{file_path}}",
+      "agent_name": "{{infer_from_stream_name}}"
+    }
+  },
+  "validation": {
+    "required_files": [
+      "{stream_path}/completed/DONE.md",
+      "{stream_path}/status.json"
+    ],
+    "status_must_be": "completed"
+  },
+  "notification": {
+    "on_trigger": "🔍 Reviewing completed work for {stream_name}",
+    "on_success": "✅ {stream_name} integrated successfully",
+    "on_failure": "❌ {stream_name} needs fixes - see integration-issues.md"
+  }
+}

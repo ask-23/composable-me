@@ -1,0 +1,25 @@
+{
+  "stream": "stream-f-assistant",
+  "agent": "Assistant",
+  "status": "not_started",
+  "started_at": null,
+  "last_updated": "2024-12-05T23:00:00Z",
+  "progress": "0%",
+  "current_task": "Waiting to start",
+  "completed_tasks": [],
+  "next_tasks": [
+    "Read assigned.md",
+    "Review requirements document",
+    "Review agent-interfaces.md",
+    "Read AGENTS.MD",
+    "Refine ATS Optimizer prompt",
+    "Implement ATS Optimizer agent",
+    "Refine Auditor Suite prompt",
+    "Implement Auditor Suite agent",
+    "Write tests"
+  ],
+  "blockers": [
+    "Depends on Stream E (Tailoring Agent) completing first"
+  ],
+  "notes": "Ready to start once Tailoring Agent is available. See assigned.md for details."
+}

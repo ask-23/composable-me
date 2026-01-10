@@ -1,0 +1,99 @@
+{
+  "name": "Work Stream Status Monitor",
+  "description": "Monitors status.json files in work streams and triggers actions on status changes",
+  "version": "1.0.0",
+  "enabled": true,
+  "triggers": [
+    {
+      "type": "file_change",
+      "pattern": ".kiro/work-streams/*/status.json",
+      "description": "Trigger when any work stream status file changes"
+    }
+  ],
+  "actions": [
+    {
+      "name": "notify_on_start",
+      "condition": "status == 'in_progress' && previous_status == 'not_started'",
+      "action": "send_message",
+      "message": "🚀 {agent} has started work on {stream}",
+      "notify": ["coordinator"]
+    },
+    {
+      "name": "notify_on_blocked",
+      "condition": "status == 'blocked'",
+      "action": "send_message",
+      "message": "⚠️ {agent} is blocked on {stream}: {blocker_description}",
+      "priority": "high",
+      "notify": ["coordinator"]
+    },
+    {
+      "name": "notify_on_completion",
+      "condition": "status == 'completed' && previous_status != 'completed'",
+      "action": "send_message",
+      "message": "✅ {agent} has completed {stream}! Ready for integration.",
+      "notify": ["coordinator"],
+      "trigger_integration": true
+    },
+    {
+      "name": "update_dashboard",
+      "condition": "always",
+      "action": "update_dashboard",
+      "description": "Update project dashboard with latest status"
+    },
+    {
+      "name": "check_dependencies",
+      "condition": "status == 'completed'",
+      "action": "check_dependencies",
+      "description": "Check if any dependent streams can now start"
+    }
+  ],
+  "notifications": {
+    "coordinator": {
+      "method": "kiro_message",
+      "description": "Send message to Kiro agent"
+    }
+  },
+  "integration_workflow": {
+    "on_completion": [
+      {
+        "step": "validate_deliverables",
+        "check": [
+          "completed/DONE.md exists",
+          "completed/ directory has code",
+          "status.json shows 100% progress"
+        ]
+      },
+      {
+        "step": "notify_coordinator",
+        "message": "Stream {stream} ready for integration review"
+      },
+      {
+        "step": "trigger_integration_agent",
+        "agent": "kiro",
+        "task": "Review and integrate {stream} deliverables"
+      }
+    ]
+  },
+  "dependency_graph": {
+    "stream-b-codex": {
+      "depends_on": [],
+      "blocks": ["stream-c-codex", "stream-d-augment", "stream-e-assistant", "stream-f-assistant"]
+    },
+    "stream-c-codex": {
+      "depends_on": ["stream-b-codex"],
+      "blocks": ["stream-d-augment", "stream-e-assistant", "stream-f-assistant"]
+    },
+    "stream-d-augment": {
+      "depends_on": ["stream-c-codex"],
+      "blocks": ["stream-e-assistant"]
+    },
+    "stream-e-assistant": {
+      "depends_on": ["stream-d-augment"],
+      "blocks": ["stream-f-assistant"]
+    },
+    "stream-f-assistant": {
+      "depends_on": ["stream-e-assistant"],
+      "blocks": []
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Sync Kiro Specs to Linear",
+  "description": "Parses all .kiro/specs/*/requirements.md files and creates corresponding Linear stories for any requirements that don't already have matching stories. Requires LINEAR_API_KEY environment variable and .kiro/linear-project.json configuration. Supports dry-run mode for safe preview before creating stories.",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "node scripts/sync-kiro-to-linear.js"
+  }
+}

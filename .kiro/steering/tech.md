@@ -1,85 +1,155 @@
-# Tech Stack
+# Technical Stack
 
-<!-- 
-TODO: Customize this file for your project.
-This is a template - replace with your actual tech stack.
--->
+## Primary Implementation
 
-## Platform
-
-<!-- What platform/infrastructure does this run on? -->
-[e.g., Cloudflare Workers, Vercel, AWS Lambda, Node.js server]
-
-## Core Technologies
-
-<!-- List the main technologies used -->
-- **Runtime:** [e.g., Node.js, Deno, Bun]
-- **Framework:** [e.g., Next.js, Express, Hono]
-- **Database:** [e.g., PostgreSQL, MongoDB, KV store]
-- **Frontend:** [e.g., React, Vue, vanilla JS]
+**Runtime:** Python 3.x with CrewAI framework
+**LLM Providers:** Together AI (recommended), OpenRouter, Chutes.ai
+**Default Model:** `meta-llama/Llama-3.3-70B-Instruct-Turbo` (Together AI)
 
 ## Dependencies
 
-### Production
-<!-- Key production dependencies -->
-- [dependency]: [what it's used for]
+Core libraries (see `requirements.txt`):
+- `crewai>=0.86.0` - Multi-agent orchestration framework
+- `crewai-tools>=0.17.0` - Agent tooling
+- `litellm>=1.0.0` - Multi-provider LLM client
+- `openai>=1.0.0` - API compatibility layer
+- `langchain>=0.3.0` - LLM abstractions
+- `python-dotenv>=1.0.0` - Environment configuration
+- `rich>=13.0.0` - Console output formatting
 
-### Development
-<!-- Key dev dependencies -->
-- [dependency]: [what it's used for]
+## Alternative Runtimes
+
+- **Go implementation** (in `runtime/go/`) - Native Go with LLM client (requires wiring)
+- **Prompt-only mode** - Copy agent prompts from `agents/*/prompt.md` and use with Claude/GPT-4 directly
+
+## Environment Configuration
+
+**Choose one provider:**
+
+Together AI (recommended):
+```bash
+export TOGETHER_API_KEY='tgp_v1_...'  # Get from together.ai
+export TOGETHER_MODEL='meta-llama/Llama-3.3-70B-Instruct-Turbo'  # Optional override
+```
+
+OpenRouter (alternative):
+```bash
+export OPENROUTER_API_KEY='sk-or-...'  # Get from openrouter.ai/keys
+export OPENROUTER_MODEL='anthropic/claude-sonnet-4.5'  # Optional override
+```
+
+Chutes.ai (alternative):
+```bash
+export CHUTES_API_KEY='your-key'  # Get from chutes.ai
+export CHUTES_MODEL='deepseek-ai/DeepSeek-V3.1'  # Optional override
+```
 
 ## Common Commands
 
+### Setup
+```bash
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### Running the System
+
+Full CLI (recommended):
+```bash
+./run.sh --jd path/to/job.md \
+         --resume path/to/resume.md \
+         --sources sources/ \
+         --out output/
+```
+
+Direct CLI execution:
+```bash
+python -m runtime.crewai.cli \
+    --jd examples/sample_jd.md \
+    --resume examples/sample_resume.md \
+    --sources examples/ \
+    --out output/
+```
+
+Quick runner (simplified):
+```bash
+python runtime/crewai/quick_crew.py \
+    --jd examples/sample_jd.md \
+    --resume examples/sample_resume.md \
+    --out output.txt
+```
+
 ### Development
+
+Activate virtual environment:
 ```bash
-npm run dev          # Start local development
-npm test             # Run tests
-npm run lint         # Run linter
+source .venv/bin/activate
 ```
 
-### Deployment
+Update dependencies:
 ```bash
-npm run deploy:staging     # Deploy to staging
-npm run deploy:production  # Deploy to production
+pip install -r requirements.txt --upgrade
 ```
-
-### Other
-```bash
-npm run sync:linear       # Sync specs to Linear
-```
-
-## Configuration
-
-### Environment Variables
-<!-- List required environment variables -->
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `DATABASE_URL` | Database connection string | Yes |
-| `API_KEY` | External API key | No |
-
-### Configuration Files
-<!-- List important config files -->
-- `[config file]`: [purpose]
 
 ## Architecture Patterns
 
-<!-- Describe key architectural decisions -->
-[Describe your architecture: monolith, microservices, serverless, etc.]
+### Agent Communication
+- Agents communicate via structured JSON, not prose
+- Each agent has single responsibility (no generation + verification in same agent)
+- Workflow orchestrator coordinates agents and enforces truth constraints
 
-## Code Style
+### State Management
+- Workflow state maintained across agent executions
+- Audit trail logs all decisions and sources
+- Context passed between agents via CrewAI task dependencies
 
-<!-- Coding conventions -->
-- [Convention 1]
-- [Convention 2]
+### Error Handling
+- Audit failures trigger retry loops (max 2 iterations)
+- Blocking issues prevent document approval
+- User escalation after max retries
 
-## Testing Approach
+## File Structure Conventions
 
-<!-- How is testing done? -->
-- Unit tests: [framework]
-- Integration tests: [approach]
-- E2E tests: [framework]
+```
+agents/                    # Agent prompt definitions
+  {agent-name}/
+    prompt.md             # Agent system prompt
 
----
+docs/                     # Core documentation (immutable rules)
+  AGENTS.MD              # Truth laws (non-negotiable)
+  AGENT_ROLES.MD         # Agent specifications
+  ARCHITECTURE.MD        # System design
+  STYLE_GUIDE.MD         # Language rules
 
-*Update this file when the tech stack changes.*
+runtime/                  # Implementation options
+  crewai/               # Python/CrewAI implementation
+  go/                   # Go implementation (alternative)
 
+examples/                 # Sample inputs for testing
+sources/                  # User source documents (resumes, etc.)
+output/                   # Generated applications
+```
+
+## Testing Strategy
+
+- Unit tests per agent (verify output structure)
+- Integration tests for workflow (happy path + error cases)
+- Prompt tests to validate agent quality
+- All agent prompts versioned in frontmatter
+
+## Model Recommendations
+
+**Recommended (Together AI):**
+- `meta-llama/Llama-3.3-70B-Instruct-Turbo` - Fast, good quality, cost-effective
+
+**High Quality (OpenRouter):**
+- `anthropic/claude-sonnet-4.5` - Latest, highest quality (more expensive)
+- `anthropic/claude-3.5-sonnet` - Fast and reliable
+- `anthropic/claude-3-opus` - Slower, highest quality
+
+**Alternative (Chutes.ai):**
+- `deepseek-ai/DeepSeek-V3.1` - Good performance, competitive pricing

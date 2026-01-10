@@ -60,6 +60,21 @@ The following steering docs MUST be customized for each project:
 | `.kiro/steering/structure.md` | Code organization, file layout |
 | `.kiro/steering/scope-control.md` | MVP scope, what's in/out, guardrails |
 
+## Work Stream Protocol (Parallel Development)
+**See `.kiro/steering/work-stream-protocol.md` for full details.**
+
+When working on parallel development streams:
+- **ALWAYS update status.json** when starting, completing tasks, or finishing
+- Update status to `in_progress` BEFORE writing any code
+- Update `completed_tasks` array as you finish each task
+- Update status to `completed` when all work is done
+- Add blockers to status.json if you get stuck
+- **Put completed work in stream-X/completed/ directory** for handoff
+- **Create completed/DONE.md** summarizing what you built
+- This enables automation hooks and coordination
+
+**Critical:** If you don't update status.json, the coordinator won't know you've completed work!
+
 ## Anti-Patterns (Never Do)
 
 - ❌ Create files without being asked
@@ -69,6 +84,7 @@ The following steering docs MUST be customized for each project:
 - ❌ Run tests against production data
 - ❌ Auto-sync to Linear without user action
 - ❌ Create documentation summarizing completed work (unless asked)
+- ❌ Forget to update status.json when starting or completing work
 
 ## When In Doubt
 

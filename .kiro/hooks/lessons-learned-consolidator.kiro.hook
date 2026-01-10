@@ -1,0 +1,22 @@
+{
+  "enabled": true,
+  "name": "Lessons Learned Consolidator",
+  "description": "Monitors creation and edits of documentation related to failures, mistakes, lessons learned, misunderstandings, and retrospectives. When such files are created or modified, prompts the agent to review and consolidate key learnings into a central project learnings document for future reference.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/*lesson*.md",
+      "**/*failure*.md",
+      "**/*mistake*.md",
+      "**/*retrospective*.md",
+      "**/*postmortem*.md",
+      "**/*learning*.md",
+      "**/RUNTIME_ERROR_FIX.md"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A file related to lessons learned, failures, or retrospectives has been modified. Please review the changes and:\n\n1. Extract key learnings, mistakes, or insights from the modified file\n2. Check if a central project learnings document exists (e.g., LESSONS_LEARNED.md, PROJECT_LEARNINGS.md)\n3. If it doesn't exist, consider creating one to consolidate all learnings\n4. Add or update the central document with:\n   - The specific issue or mistake encountered\n   - Root cause analysis\n   - What was learned\n   - How to prevent it in the future\n   - Date and context\n5. Organize learnings by category (e.g., Architecture, Testing, Deployment, Communication)\n6. Keep entries concise but actionable\n\nThis helps build institutional knowledge and prevents repeating the same mistakes."
+  }
+}

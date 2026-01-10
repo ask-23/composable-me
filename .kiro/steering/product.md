@@ -1,63 +1,44 @@
 # Product Overview
 
-<!-- 
-TODO: Customize this file for your project.
-This is a template - replace the placeholders with your product details.
--->
-
-## Product Name
-
-<!-- What is this product called? -->
-[Your Product Name]
-
-## Description
-
-<!-- One paragraph describing what this product does -->
-[Describe your product here. What problem does it solve? Who is it for?]
+Composable Crew is a truth-constrained, multi-agent system for generating high-quality job applications. It's a personal job search tool designed for senior engineers and technical leaders.
 
 ## Core Value Proposition
 
-<!-- What value does this product provide? -->
-[What can users do with this product that they couldn't do before?]
+The system solves the job application problem through specialized AI agents that:
+- Never fabricate experience or alter chronology
+- Generate human-sounding content that passes AI detection
+- Tailor applications precisely to job requirements
+- Surface unique differentiators rather than generic strengths
 
-## User Flows
+## Key Differentiators
 
-### Primary User Flow
-<!-- The main thing users do with your product -->
-1. User does X
-2. System responds with Y
-3. User gets Z
+1. **Truth-First Architecture** - All claims must trace to source documents (AGENTS.MD enforces immutable truth laws)
+2. **Anti-AI Detection** - Built-in language patterns to avoid AI detection tools (STYLE_GUIDE.MD)
+3. **Multi-Agent Orchestration** - Specialized agents with single responsibilities coordinated by Commander
+4. **Human-in-the-Loop** - User greenlight required before proceeding with applications
 
-### Secondary Flows
-<!-- Other important user journeys -->
-[Add other flows as needed]
+## Target User
 
-## Key Features
+Senior+ engineers and technical leaders (DevOps, Platform, SRE, Architect, VP Engineering) who need to:
+- Tailor applications without spending hours per role
+- Maintain truthfulness while positioning experience effectively
+- Avoid AI detection in application materials
+- Find and articulate unique value propositions
 
-<!-- List the main features -->
-- Feature 1: [Description]
-- Feature 2: [Description]
-- Feature 3: [Description]
+## Workflow
 
-## Users/Personas
+1. User provides job description and resume
+2. Commander analyzes fit and requests greenlight
+3. Gap Analyzer maps requirements to experience
+4. Interrogator-Prepper generates questions to fill gaps
+5. Differentiator identifies unique positioning
+6. Tailoring Agent creates resume + cover letter
+7. Auditor Suite verifies truth, tone, and compliance
 
-<!-- Who uses this product? -->
-- **Primary user:** [Description]
-- **Secondary user:** [Description]
+## Non-Negotiable Rules
 
-## Production URLs
-
-<!-- Where is this deployed? -->
-- Production: [URL]
-- Staging: [URL]
-
-## Success Metrics
-
-<!-- How do you know if this product is successful? -->
-- [Metric 1]
-- [Metric 2]
-
----
-
-*This file should be updated as the product evolves.*
-
+- Chronology is sacred (no date changes, no reordering)
+- No fabrication (no invented tools, metrics, or achievements)
+- The Everest Rule: if you didn't do it, don't claim it
+- Source authority: all claims must trace to verified documents
+- Adjacent framing: transferable experience framed honestly, not as direct

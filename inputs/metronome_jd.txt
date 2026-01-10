@@ -1,0 +1,94 @@
+About the job
+About Us
+
+Metronome is the leading usage-based billing platform built for modern software companies. With Metronome, companies can launch products faster, offer any pricing model, and streamline finance workflows without writing code.
+
+
+
+Our platform computes millions of invoices per billing period and is scaling rapidly to accommodate new customers, saving them hours of development time and manual invoicing and enabling them to use consumption data to better serve their customers. Our customers love our product and approach, and we’re humbled to work with amazing companies like OpenAI, Databricks, NVIDIA, Confluent, and Anthropic.
+
+
+
+You'll be joining an experienced team that includes founders who have successfully built and sold startups before. Our founders and employees also have direct experience building and scaling teams through massive growth at companies like Dropbox, Clever, and New Relic. On the back of this experience and our success-to-date, we’ve raised over $128M from leading investors including NEA, Andreessen Horowitz, General Catalyst, Elad Gil, and Workday Ventures. We’re also proud to have founders and executives of companies like Segment, Plaid, Looker, Gitlab, Confluent, HashiCorp, and Snowflake, as investors who have experienced the pain we're solving firsthand.
+
+
+
+About the Role
+
+We are looking for an experienced infrastructure leader to own and scale the technical foundation that powers Metronome's platform. As Head of Infrastructure, you'll lead a growing team of ~15 engineers responsible for the real-time systems that process billions of events, millions of invoices and enable some of the world's most innovative companies to build their operations on Metronome.
+
+
+
+This role combines deep technical expertise with organizational leadership, owning the reliability, scalability, and operational excellence of our infrastructure layer. You'll be responsible for ensuring our platform can handle exponential customer growth while maintaining the enterprise-grade reliability that our customers depend on for their critical business operations.
+
+
+
+What You'll Do
+
+Infrastructure Leadership and Strategy
+
+Lead and grow a team of 15+ infrastructure engineers, managing both engineering managers and senior individual contributors while providing mentorship, career development, and technical guidance across multiple teams
+Build and scale the infrastructure organization structure, defining team responsibilities, establishing clear ownership boundaries, and ensuring effective coordination between infrastructure teams and product engineering groups
+Own the technical roadmap for Metronome's infrastructure layer as we scale to support larger scale and evolve from commodity solutions to specialized streaming infrastructure
+Partner with engineering leadership to balance infrastructure investments with product development needs, serving as an enabler for product engineering teams
+
+
+Platform Reliability and Operations
+
+Own the end-to-end reliability and performance of real-time systems that process billions of events and millions of invoices with enterprise-grade uptime, latency and correctness requirements
+Maintain and enhance comprehensive monitoring, alerting, and observability across all infrastructure services
+Lead incident response and post-mortem processes, ensuring systematic improvements to prevent recurrence and drive operational excellence practices
+
+
+Scaling and Team Development
+
+Architect infrastructure solutions that support exponential customer growth and increasingly complex technical requirements
+Foster a culture of operational excellence where engineers take ownership of system reliability and customer experience
+Drive hiring and team scaling as infrastructure demands grow with business expansion
+ 
+
+Impact You'll Have
+
+Own critical infrastructure: Lead the technical systems that power the entirety of the Metronome platform ensuring reliability and performance at scale
+Build a world-class infrastructure organization: Develop and scale a high-performing team that sets the standard for operational excellence
+Enable massive business growth: Architect and maintain the infrastructure foundation that allows Metronome to support significantly larger customers and more complex billing scenarios
+Create competitive advantages: Drive the evolution toward purpose-built systems that differentiate Metronome in the market
+Drive customer confidence: Ensure the technical reliability that enables customers to trust Metronome with their most critical business operations
+Shape infrastructure excellence: Influence how modern billing infrastructure is built and operated, with autonomy to implement cutting-edge approaches
+
+
+Qualifications
+
+8+ years of infrastructure engineering experience including managing engineering managers and driving cross-organizational initiatives
+Track record building and scaling engineering teams including hiring, mentoring, and creating processes that support rapid organizational growth
+Proven track record scaling critical infrastructure at high-growth companies
+Deep expertise in modern infrastructure technologies including streaming data platforms, distributed systems architecture, cloud platforms, observability stacks, and infrastructure-as-code
+Strong operational excellence background including SLI/SLO frameworks, incident management, capacity planning, and proactive monitoring systems
+Experience partnering with product engineering teams as an enabler, balancing infrastructure needs with product velocity and business requirements
+Excellent communication and technical judgment with experience presenting technical concepts to stakeholders and deep understanding of how infrastructure decisions impact performance, productivity, and business outcomes
+
+
+Compensation
+
+The estimated base salary range for this role is $220,000 - 275,000. In addition to your base salary, Metronome offers a competitive total rewards package, including but not limited to, market-benched equity, sales incentive pay (for eligible roles), comprehensive health benefits, and other benefits listed below.
+
+
+
+The actual base salary will vary based on factors including market value, individual qualifications objectively assessed during the interview process, and previous experience. The listed range above should serve as a guideline and may be modified at any time.
+
+We believe that compensation reflects the expected impact you will have at the company, relative to the market value of your role. We also conduct an annual pay audit to ensure pay is fair, indexed to market value, and that pay takes into account continued performance at Metronome. If you would like to learn more about our philosophy or about why we are all billing nerds, send us a message. We’d love to talk!
+
+
+
+Benefits
+
+for Full-time employees:
+
+Excellent medical, dental, vision, and life insurance coverage, including a One Medical membership
+Paid parental leave
+FSA (Flexible spending account)
+Retirement planning - Traditional and ROTH 401(k)
+Flexible time off
+Employee assistance program (mental health benefits)
+Culture where personal growth is highly valued
+We're an equal opportunity employer. All applicants will be considered for employment without attention to race, color, religion, sex, sexual orientation, gender identity, national origin, veteran or disability status.

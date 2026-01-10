@@ -1,0 +1,58 @@
+{
+  "agent": "Gap Analyzer",
+  "timestamp": "2025-12-09T16:30:00Z",
+  "confidence": 0.92,
+  "gap_analysis": {
+    "meta": {
+      "role": "Senior Platform Engineer",
+      "company": "TechCorp",
+      "analyzed": "2025-12-09"
+    },
+    "summary": {
+      "fit_score": 88,
+      "recommendation": "PURSUE",
+      "blockers": 0,
+      "interview_topics": 3
+    },
+    "requirements": [
+      {
+        "id": 1,
+        "text": "7+ years of experience in DevOps/SRE/Platform Engineering",
+        "type": "explicit_hard",
+        "classification": "direct_match",
+        "evidence": "- Limecord (2023-present): Senior DevOps Engineer\n- Agora Data (2022-2023): DevOps Engineer\n- Supreme Golf (2019-2021): Platform Engineer\n- T-Mobile (2017-2019): Senior Systems Engineer\n- Yum! Brands (2015-2017): Systems Administrator\nTotal: 10+ years relevant experience",
+        "confidence": "high"
+      },
+      {
+        "id": 2,
+        "text": "Deep expertise with AWS (EC2, ECS, Lambda, RDS, etc.)",
+        "type": "explicit_hard",
+        "classification": "direct_match",
+        "evidence": "Resume lists extensive AWS experience across multiple roles:\n- Limecord: ECS Fargate, RDS, Lambda, multi-account landing zone\n- Agora: Lambda, SQS\n- Supreme Golf: AWS cloud services\n- Skills section explicitly lists: ECS, Lambda, RDS, S3, IAM, Organizations, Control Tower",
+        "confidence": "high"
+      },
+      {
+        "id": 3,
+        "text": "Experience with agentic AI tools in infrastructure",
+        "type": "explicit_soft",
+        "classification": "direct_match",
+        "evidence": "Limecord: 'Introduced Claude-based PR review bot for infrastructure changes, catching 30% of issues before human review'",
+        "confidence": "high",
+        "framing": "Highlight this as a key differentiator given the specific mention in JD"
+      }
+    ],
+    "gaps": [
+      {
+        "id": 4,
+        "text": "Strong scripting skills (Python, Bash, or Go)",
+        "type": "explicit_hard",
+        "classification": "direct_match",
+        "evidence": "Resume lists Python, Bash, and Go in Skills section and experience bullets",
+        "confidence": "high"
+      }
+    ]
+  },
+  "tailored_output": {
+    "resume_preview": "# Alex Chen\n**Senior Platform Engineer**\n\n## Summary\nPlatform engineer with 10+ years experience... [truncated for preview]"
+  }
+}
