@@ -67,3 +67,16 @@ Thumbs.db
 *.tmp
 *.bak
 *.swp
+
+# Node
+node_modules/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# PII and sensitive files
+*[CANDIDATE NAME]*
+.env
+.env.*

@@ -184,7 +184,7 @@ class TestHydraWorkflow:
         assert workflow.auditor_suite.execute.call_count == 4  # 2 docs x 2 attempts
 
     def test_execute_audit_max_retries_exceeded(self, workflow, sample_context, mock_agent_results):
-        """Test execution with audit failing maximum retries"""
+        """Test execution with audit failing maximum retries - now returns success with audit_failed=True"""
         # Mock all agent executions
         workflow.gap_analyzer.execute.return_value = mock_agent_results["gap_analysis"]
         workflow.interrogator_prepper.execute.return_value = mock_agent_results["interrogation"]
@@ -197,13 +197,40 @@ class TestHydraWorkflow:
 
         result = workflow.execute(sample_context)
 
-        assert result.success is False
-        assert result.state == WorkflowState.FAILED
-        assert "Document failed audit after maximum retries" in result.error_message
+        # STABILITY FIX: Audit failures are now non-fatal - documents are still produced
+        assert result.success is True  # Documents were generated
+        assert result.state == WorkflowState.COMPLETED
+        assert result.audit_failed is True  # But audit failed
+        assert result.audit_error == "Document failed audit after maximum retries"
+        assert result.audit_report["final_status"] == "REJECTED"
+        assert result.final_documents is not None  # Documents still available
         assert workflow.auditor_suite.execute.call_count == 6  # 2 docs x 3 attempts (initial + 2 retries)
 
+    def test_execute_audit_crash(self, workflow, sample_context, mock_agent_results):
+        """Test execution with auditor crashing - returns success with audit_failed=True"""
+        # Mock all agent executions up to auditor
+        workflow.gap_analyzer.execute.return_value = mock_agent_results["gap_analysis"]
+        workflow.interrogator_prepper.execute.return_value = mock_agent_results["interrogation"]
+        workflow.differentiator.execute.return_value = mock_agent_results["differentiation"]
+        workflow.tailoring_agent.execute.return_value = mock_agent_results["tailoring"]
+        workflow.ats_optimizer.execute.return_value = mock_agent_results["ats_optimization"]
+
+        # Auditor crashes on all attempts
+        workflow.auditor_suite.execute.side_effect = Exception("LLM API timeout")
+
+        result = workflow.execute(sample_context)
+
+        # STABILITY FIX: Audit crashes are now non-fatal - documents are still produced
+        assert result.success is True  # Documents were generated
+        assert result.state == WorkflowState.COMPLETED
+        assert result.audit_failed is True
+        assert "Audit crashed" in result.audit_error
+        assert result.audit_report["final_status"] == "AUDIT_CRASHED"
+        assert result.final_documents is not None  # Documents still available
+        assert result.intermediate_results is not None  # Intermediate results preserved
+
     def test_execute_agent_failure(self, workflow, sample_context):
-        """Test execution with agent failure"""
+        """Test execution with agent failure (pre-audit stages still crash workflow)"""
         # Mock gap analyzer to raise exception
         workflow.gap_analyzer.execute.side_effect = Exception("Gap analysis failed")
 
