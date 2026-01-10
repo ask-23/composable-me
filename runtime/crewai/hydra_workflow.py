@@ -50,6 +50,10 @@ class WorkflowResult:
     audit_report: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
     execution_log: List[str] = None
+    # New fields for partial results on failure
+    intermediate_results: Optional[Dict[str, Any]] = None
+    audit_failed: bool = False
+    audit_error: Optional[str] = None
 
 
 class HydraWorkflow:
@@ -83,7 +87,7 @@ class HydraWorkflow:
     def execute(self, context: Dict[str, Any]) -> WorkflowResult:
         """
         Execute the complete workflow pipeline
-        
+
         Args:
             context: Dictionary containing:
                 - job_description: The job description text
@@ -91,45 +95,59 @@ class HydraWorkflow:
                 - source_documents: User source documents for verification
                 - target_role: The role being applied for
                 - research_data: Optional research data
-            
+
         Returns:
-            WorkflowResult with final documents and audit report
+            WorkflowResult with final documents and audit report.
+            Note: success=True even if audit fails/crashes - documents are still usable.
+            Check audit_failed flag to determine if manual review is needed.
         """
         try:
             self._log("Starting HydraWorkflow execution")
             self._validate_input_context(context)
-            
+
             # Execute pipeline stages
             gap_result = self._execute_gap_analysis(context)
             interrogation_result = self._execute_interrogation(context, gap_result)
             differentiation_result = self._execute_differentiation(context, gap_result, interrogation_result)
             tailoring_result = self._execute_tailoring(context, gap_result, interrogation_result, differentiation_result)
             ats_result = self._execute_ats_optimization(context, tailoring_result)
-            
-            # Execute audit with retry loop
+
+            # Execute audit with retry loop (no longer throws exceptions)
             final_result = self._execute_audit_with_retry(context, ats_result)
-            
-            self.current_state = WorkflowState.COMPLETED
-            self._log("HydraWorkflow execution completed successfully")
-            
+
+            # Determine final state based on audit result
+            audit_failed = final_result.get("audit_failed", False)
+            audit_status = final_result.get("audit_report", {}).get("final_status", "UNKNOWN")
+
+            if audit_failed:
+                self.current_state = WorkflowState.COMPLETED  # Still completed, just with warnings
+                self._log(f"HydraWorkflow completed with audit status: {audit_status}")
+            else:
+                self.current_state = WorkflowState.COMPLETED
+                self._log("HydraWorkflow execution completed successfully")
+
             return WorkflowResult(
                 state=self.current_state,
-                success=True,
+                success=True,  # Documents were generated, even if audit failed
                 final_documents=final_result.get("final_documents"),
                 audit_report=final_result.get("audit_report"),
-                execution_log=self.execution_log.copy()
+                execution_log=self.execution_log.copy(),
+                intermediate_results=self.get_intermediate_results(),
+                audit_failed=audit_failed,
+                audit_error=final_result.get("audit_error")
             )
-            
+
         except Exception as e:
             self.current_state = WorkflowState.FAILED
             error_msg = f"Workflow execution failed: {str(e)}"
             self._log(error_msg)
-            
+
             return WorkflowResult(
                 state=self.current_state,
                 success=False,
                 error_message=error_msg,
-                execution_log=self.execution_log.copy()
+                execution_log=self.execution_log.copy(),
+                intermediate_results=self.get_intermediate_results()  # Include partial results on failure
             )
     
     def _validate_input_context(self, context: Dict[str, Any]) -> None:
@@ -226,7 +244,13 @@ class HydraWorkflow:
         return result
 
     def _execute_audit_with_retry(self, context: Dict[str, Any], ats_result: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute audit with retry logic (maximum 2 retries)"""
+        """
+        Execute audit with retry logic (maximum 2 retries).
+
+        STABILITY FIX: Audit failures are now non-fatal. If audit fails or crashes,
+        we return the documents with an AUDIT_FAILED status instead of raising an exception.
+        This ensures all prior work (gap analysis, tailoring, ATS optimization) is preserved.
+        """
         self.current_state = WorkflowState.AUDITING
         self._log("Executing Audit with Retry Logic")
 
@@ -235,6 +259,10 @@ class HydraWorkflow:
             "resume": ats_result.get("optimized_resume", ""),
             "cover_letter": ats_result.get("optimized_cover_letter", "")
         }
+
+        last_error = None
+        last_resume_audit = None
+        last_cover_letter_audit = None
 
         while retry_count <= self.max_audit_retries:
             try:
@@ -245,6 +273,7 @@ class HydraWorkflow:
                     "document_type": "resume"
                 }
                 resume_audit = self.auditor_suite.execute(resume_audit_context)
+                last_resume_audit = resume_audit
 
                 # Audit the cover letter if present
                 cover_letter_audit = None
@@ -255,6 +284,7 @@ class HydraWorkflow:
                         "document_type": "cover_letter"
                     }
                     cover_letter_audit = self.auditor_suite.execute(cover_letter_audit_context)
+                    last_cover_letter_audit = cover_letter_audit
 
                 # Check if audit passed - handle both nested and flat structures
                 # Try nested first (audit_report.approval.approved)
@@ -264,7 +294,7 @@ class HydraWorkflow:
                 else:
                     # Try flat structure (approval.approved)
                     resume_approved = resume_audit.get("approval", {}).get("approved", False)
-                
+
                 cover_letter_approved = True  # Default to true if no cover letter
                 if cover_letter_audit:
                     if "audit_report" in cover_letter_audit:
@@ -281,7 +311,9 @@ class HydraWorkflow:
                             "cover_letter_audit": cover_letter_audit,
                             "final_status": "APPROVED",
                             "retry_count": retry_count
-                        }
+                        },
+                        "audit_failed": False,
+                        "audit_error": None
                     }
 
                 # If audit failed and we have retries left
@@ -292,19 +324,56 @@ class HydraWorkflow:
                     # Apply fixes from audit recommendations
                     current_documents = self._apply_audit_fixes(current_documents, resume_audit, cover_letter_audit)
                 else:
-                    # Max retries reached
-                    self._log("Max audit retries reached, workflow failed")
-                    raise ValidationError("Document failed audit after maximum retries")
+                    # Max retries reached - return with REJECTED status instead of crashing
+                    self._log("Max audit retries reached, returning documents with REJECTED status")
+                    return {
+                        "final_documents": current_documents,
+                        "audit_report": {
+                            "resume_audit": resume_audit,
+                            "cover_letter_audit": cover_letter_audit,
+                            "final_status": "REJECTED",
+                            "retry_count": retry_count,
+                            "rejection_reason": "Document failed audit after maximum retries"
+                        },
+                        "audit_failed": True,
+                        "audit_error": "Document failed audit after maximum retries"
+                    }
 
             except Exception as e:
+                last_error = str(e)
                 if retry_count < self.max_audit_retries:
                     retry_count += 1
                     self._log(f"Audit error: {str(e)}, attempting retry {retry_count}/{self.max_audit_retries}")
                 else:
-                    raise e
+                    # STABILITY FIX: Instead of crashing, return documents with AUDIT_CRASHED status
+                    self._log(f"Audit crashed after {retry_count + 1} attempts: {str(e)}")
+                    return {
+                        "final_documents": current_documents,
+                        "audit_report": {
+                            "resume_audit": last_resume_audit,
+                            "cover_letter_audit": last_cover_letter_audit,
+                            "final_status": "AUDIT_CRASHED",
+                            "retry_count": retry_count,
+                            "crash_error": str(e)
+                        },
+                        "audit_failed": True,
+                        "audit_error": f"Audit crashed: {str(e)}"
+                    }
 
-        # Should not reach here, but safety fallback
-        raise ValidationError("Audit retry loop exceeded maximum attempts")
+        # Safety fallback - should not reach here, but return gracefully instead of crashing
+        self._log("Audit retry loop exceeded, returning documents with AUDIT_CRASHED status")
+        return {
+            "final_documents": current_documents,
+            "audit_report": {
+                "resume_audit": last_resume_audit,
+                "cover_letter_audit": last_cover_letter_audit,
+                "final_status": "AUDIT_CRASHED",
+                "retry_count": retry_count,
+                "crash_error": last_error or "Unknown error in audit retry loop"
+            },
+            "audit_failed": True,
+            "audit_error": last_error or "Unknown error in audit retry loop"
+        }
 
     def _apply_audit_fixes(self, documents: Dict[str, str], resume_audit: Dict[str, Any],
                           cover_letter_audit: Optional[Dict[str, Any]]) -> Dict[str, str]:

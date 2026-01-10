@@ -1,0 +1,28 @@
+{
+  "name": "hydra-frontend",
+  "type": "module",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed"
+  },
+  "dependencies": {
+    "@astrojs/node": "^9.0.0",
+    "@astrojs/svelte": "^7.0.0",
+    "astro": "^5.0.0",
+    "marked": "^15.0.0",
+    "svelte": "^5.0.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.6",
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0"
+  }
+}

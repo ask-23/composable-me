@@ -130,7 +130,7 @@ def _read_sources(directory: Path) -> str:
     return "\n".join(parts)
 
 
-def _write_output_files(out_dir: Path, result) -> None:
+def _write_output_files(out_dir: Path, result, include_intermediate: bool = False) -> None:
     """Write workflow outputs to disk."""
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -144,6 +144,15 @@ def _write_output_files(out_dir: Path, result) -> None:
     log_lines = result.execution_log or []
     if isinstance(log_lines, Iterable):
         (out_dir / "execution_log.txt").write_text("\n".join(log_lines))
+
+    # Write intermediate results if requested (useful for debugging or partial failures)
+    if include_intermediate and result.intermediate_results:
+        intermediate_dir = out_dir / "intermediate"
+        intermediate_dir.mkdir(parents=True, exist_ok=True)
+        for stage_name, stage_result in result.intermediate_results.items():
+            (intermediate_dir / f"{stage_name}.yaml").write_text(
+                yaml.safe_dump(stage_result, sort_keys=False, default_flow_style=False)
+            )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -212,12 +221,39 @@ def main(argv: list[str] | None = None) -> int:
     result = workflow.execute(context)
 
     if result.success:
-        _write_output_files(out_dir, result)
-        final_status = result.audit_report.get("final_status") if result.audit_report else "UNKNOWN"
-        print(f"✅ Success! Audit status: {final_status}. Outputs saved to {out_dir}")
-        return 0
+        # Always write outputs on success (even if audit failed/crashed)
+        include_intermediate = getattr(result, 'audit_failed', False)
+        _write_output_files(out_dir, result, include_intermediate=include_intermediate)
 
+        final_status = result.audit_report.get("final_status") if result.audit_report else "UNKNOWN"
+
+        # Different messages based on audit status
+        if getattr(result, 'audit_failed', False):
+            audit_error = getattr(result, 'audit_error', 'Unknown audit error')
+            if final_status == "AUDIT_CRASHED":
+                print(f"⚠️  Documents generated but audit crashed: {audit_error}")
+                print(f"   Documents saved to {out_dir} - MANUAL REVIEW REQUIRED")
+                print(f"   Intermediate results saved to {out_dir}/intermediate/")
+            elif final_status == "REJECTED":
+                print(f"⚠️  Documents generated but audit rejected: {audit_error}")
+                print(f"   Documents saved to {out_dir} - MANUAL REVIEW REQUIRED")
+                print(f"   Check audit_report.yaml for rejection details")
+            else:
+                print(f"⚠️  Documents generated with audit status: {final_status}")
+                print(f"   Outputs saved to {out_dir}")
+            return 1  # Partial success exit code
+        else:
+            print(f"✅ Success! Audit status: {final_status}. Outputs saved to {out_dir}")
+            return 0
+
+    # True failure - workflow crashed before producing documents
     print(f"❌ Workflow failed: {result.error_message}", file=sys.stderr)
+
+    # Still try to save intermediate results if available
+    if result.intermediate_results:
+        _write_output_files(out_dir, result, include_intermediate=True)
+        print(f"   Partial results saved to {out_dir}/intermediate/", file=sys.stderr)
+
     return 2
 
 

@@ -1,0 +1,10 @@
+# Litestar backend for Hydra web UI
+litestar[standard]>=2.0.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.0.0
+python-multipart>=0.0.9
+sse-starlette>=2.0.0
+python-dotenv>=1.0.0
+
+# Reference parent package for HydraWorkflow
+# Run with: PYTHONPATH=/Users/admin/git/composable-crew python -m uvicorn app:app
