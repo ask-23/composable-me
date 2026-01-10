@@ -35,6 +35,7 @@ class Job:
     error_message: Optional[str] = None
     audit_failed: bool = False
     audit_error: Optional[str] = None
+    agent_models: dict[str, str] = field(default_factory=dict)
 
     # For SSE updates
     _event_queue: asyncio.Queue = field(default_factory=asyncio.Queue, repr=False)

@@ -93,6 +93,7 @@ class JobsController(Controller):
             error_message=job.error_message,
             audit_failed=job.audit_failed,
             audit_error=job.audit_error,
+            agent_models=job.agent_models,
         )
 
     @get("/{job_id:str}/stream")

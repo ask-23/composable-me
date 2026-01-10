@@ -69,6 +69,7 @@ def _run_workflow_sync(job: Job) -> None:
         job.error_message = result.error_message
         job.audit_failed = getattr(result, "audit_failed", False)
         job.audit_error = getattr(result, "audit_error", None)
+        job.agent_models = result.agent_models or {}
 
         logger.info(f"Job {job.id} completed: success={job.success}, state={job.state}")
 
@@ -133,6 +134,7 @@ async def run_workflow_async(job: Job) -> None:
     await job.emit_event("started", {
         "job_id": job.id,
         "state": job.state.value,
+        "agent_models": job.agent_models,
     })
 
     loop = asyncio.get_event_loop()
@@ -151,6 +153,7 @@ async def run_workflow_async(job: Job) -> None:
             "audit_failed": job.audit_failed,
             "audit_error": job.audit_error,
             "error_message": job.error_message,
+            "agent_models": job.agent_models,
         })
 
     except Exception as e:

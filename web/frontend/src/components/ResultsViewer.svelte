@@ -4,8 +4,8 @@
    * Shows resume, cover letter, audit report, and intermediate results
    */
 
-  import type { FinalDocuments, AuditReport } from '../lib/types';
-  import MarkdownViewer from './MarkdownViewer.svelte';
+  import type { FinalDocuments, AuditReport } from "../lib/types";
+  import MarkdownViewer from "./MarkdownViewer.svelte";
 
   interface Props {
     documents?: FinalDocuments;
@@ -13,6 +13,7 @@
     intermediateResults?: Record<string, unknown>;
     auditFailed?: boolean;
     auditError?: string;
+    agentModels?: Record<string, string>;
   }
 
   let {
@@ -21,18 +22,23 @@
     intermediateResults,
     auditFailed = false,
     auditError,
+    agentModels = {},
   }: Props = $props();
 
-  type Tab = 'resume' | 'cover_letter' | 'audit' | 'debug';
-  let activeTab = $state<Tab>('resume');
+  type Tab = "resume" | "cover_letter" | "audit" | "debug";
+  let activeTab = $state<Tab>("resume");
 
   // Derived values
   let hasDocuments = $derived(!!documents);
-  let auditStatus = $derived(auditReport?.final_status || 'N/A');
+  let auditStatus = $derived(auditReport?.final_status || "N/A");
   let auditStatusClass = $derived(
-    auditStatus === 'APPROVED' ? 'success' :
-    auditStatus === 'REJECTED' ? 'warning' :
-    auditStatus === 'AUDIT_CRASHED' ? 'error' : ''
+    auditStatus === "APPROVED"
+      ? "success"
+      : auditStatus === "REJECTED"
+        ? "warning"
+        : auditStatus === "AUDIT_CRASHED"
+          ? "error"
+          : "",
   );
 </script>
 
@@ -41,9 +47,11 @@
   {#if auditFailed}
     <div class="status-banner warning">
       <strong>Manual Review Required</strong>
-      <p>{auditError || 'Audit did not pass. Please review documents carefully.'}</p>
+      <p>
+        {auditError || "Audit did not pass. Please review documents carefully."}
+      </p>
     </div>
-  {:else if auditStatus === 'APPROVED'}
+  {:else if auditStatus === "APPROVED"}
     <div class="status-banner success">
       <strong>Audit Passed</strong>
       <p>Documents verified and ready to submit.</p>
@@ -54,30 +62,30 @@
   <div class="tabs">
     <button
       class="tab"
-      class:active={activeTab === 'resume'}
-      onclick={() => activeTab = 'resume'}
+      class:active={activeTab === "resume"}
+      onclick={() => (activeTab = "resume")}
     >
       Resume
     </button>
     <button
       class="tab"
-      class:active={activeTab === 'cover_letter'}
-      onclick={() => activeTab = 'cover_letter'}
+      class:active={activeTab === "cover_letter"}
+      onclick={() => (activeTab = "cover_letter")}
     >
       Cover Letter
     </button>
     <button
       class="tab"
-      class:active={activeTab === 'audit'}
-      onclick={() => activeTab = 'audit'}
+      class:active={activeTab === "audit"}
+      onclick={() => (activeTab = "audit")}
     >
       Audit Report
       <span class="badge {auditStatusClass}">{auditStatus}</span>
     </button>
     <button
       class="tab"
-      class:active={activeTab === 'debug'}
-      onclick={() => activeTab = 'debug'}
+      class:active={activeTab === "debug"}
+      onclick={() => (activeTab = "debug")}
     >
       Debug
     </button>
@@ -85,12 +93,15 @@
 
   <!-- Tab content -->
   <div class="tab-content">
-    {#if activeTab === 'resume'}
+    {#if activeTab === "resume"}
       <div class="document-panel">
         <div class="document-header">
           <h3>Tailored Resume</h3>
           {#if documents?.resume}
-            <button class="copy-btn" onclick={() => navigator.clipboard.writeText(documents.resume)}>
+            <button
+              class="copy-btn"
+              onclick={() => navigator.clipboard.writeText(documents.resume)}
+            >
               Copy
             </button>
           {/if}
@@ -101,13 +112,16 @@
           <p class="empty">No resume generated.</p>
         {/if}
       </div>
-
-    {:else if activeTab === 'cover_letter'}
+    {:else if activeTab === "cover_letter"}
       <div class="document-panel">
         <div class="document-header">
           <h3>Cover Letter</h3>
           {#if documents?.cover_letter}
-            <button class="copy-btn" onclick={() => navigator.clipboard.writeText(documents.cover_letter)}>
+            <button
+              class="copy-btn"
+              onclick={() =>
+                navigator.clipboard.writeText(documents.cover_letter)}
+            >
               Copy
             </button>
           {/if}
@@ -118,8 +132,7 @@
           <p class="empty">No cover letter generated.</p>
         {/if}
       </div>
-
-    {:else if activeTab === 'audit'}
+    {:else if activeTab === "audit"}
       <div class="audit-panel">
         <h3>Audit Report</h3>
         {#if auditReport}
@@ -158,21 +171,29 @@
           {#if auditReport.cover_letter_audit}
             <div class="audit-section">
               <h4>Cover Letter Audit</h4>
-              <pre>{JSON.stringify(auditReport.cover_letter_audit, null, 2)}</pre>
+              <pre>{JSON.stringify(
+                  auditReport.cover_letter_audit,
+                  null,
+                  2,
+                )}</pre>
             </div>
           {/if}
         {:else}
           <p class="empty">No audit report available.</p>
         {/if}
       </div>
-
-    {:else if activeTab === 'debug'}
+    {:else if activeTab === "debug"}
       <div class="debug-panel">
         <h3>Intermediate Results</h3>
         {#if intermediateResults && Object.keys(intermediateResults).length > 0}
           {#each Object.entries(intermediateResults) as [stage, result]}
             <details class="debug-section">
-              <summary>{stage}</summary>
+              <summary>
+                {stage}
+                {#if agentModels[stage]}
+                  <span class="model-tag">{agentModels[stage]}</span>
+                {/if}
+              </summary>
               <pre>{JSON.stringify(result, null, 2)}</pre>
             </details>
           {/each}
@@ -376,6 +397,19 @@
     padding: 0.75rem 1rem;
     cursor: pointer;
     font-weight: 500;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .model-tag {
+    font-size: 0.7rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+    font-family: monospace;
   }
 
   .debug-section pre {
