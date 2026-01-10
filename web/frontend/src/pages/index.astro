@@ -1,0 +1,426 @@
+---
+import Layout from '../layouts/Layout.astro';
+import FileUpload from '../components/FileUpload.svelte';
+---
+
+<Layout title="Upload">
+  <div class="upload-page">
+    <h1>Generate Application Materials</h1>
+    <p class="subtitle">
+      Upload your job description and resume, and Hydra's multi-agent system will
+      create tailored application materials optimized for ATS and human reviewers.
+    </p>
+
+    <form id="upload-form" class="card upload-form">
+      <FileUpload
+        client:load
+        label="Job Description"
+        name="jd"
+        accept=".md,.txt"
+        required={true}
+      />
+
+      <FileUpload
+        client:load
+        label="Resume"
+        name="resume"
+        accept=".md,.txt"
+        required={true}
+      />
+
+      <FileUpload
+        client:load
+        label="Source Documents (optional)"
+        name="sources"
+        accept=".md,.txt"
+        multiple={true}
+      />
+
+      <div class="form-actions">
+        <button type="submit" id="submit-btn">
+          Generate Application
+        </button>
+      </div>
+
+      <div id="error-message" class="error" style="display: none;"></div>
+    </form>
+
+    <!-- Full-screen loading overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+      <div class="loading-content">
+        <div class="loading-spinner">
+          <div class="spinner-ring"></div>
+          <div class="spinner-ring"></div>
+          <div class="spinner-ring"></div>
+        </div>
+        <h2 id="loading-status">Reading files...</h2>
+        <p id="loading-detail">Parsing your job description and resume</p>
+        <div class="loading-steps">
+          <div class="step active">
+            <span class="step-dot"></span>
+            <span>Read</span>
+          </div>
+          <div class="step-line"></div>
+          <div class="step">
+            <span class="step-dot"></span>
+            <span>Upload</span>
+          </div>
+          <div class="step-line"></div>
+          <div class="step">
+            <span class="step-dot"></span>
+            <span>Start</span>
+          </div>
+          <div class="step-line"></div>
+          <div class="step">
+            <span class="step-dot"></span>
+            <span>Go</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="features">
+      <h2>What Hydra Does</h2>
+      <div class="feature-grid">
+        <div class="feature">
+          <h3>Gap Analysis</h3>
+          <p>Maps job requirements to your experience, identifying matches and gaps.</p>
+        </div>
+        <div class="feature">
+          <h3>Interview Prep</h3>
+          <p>Generates STAR+ questions for any skill gaps to prepare your narrative.</p>
+        </div>
+        <div class="feature">
+          <h3>Differentiation</h3>
+          <p>Identifies your unique value propositions that set you apart.</p>
+        </div>
+        <div class="feature">
+          <h3>Tailoring</h3>
+          <p>Creates customized resume and cover letter for the specific role.</p>
+        </div>
+        <div class="feature">
+          <h3>ATS Optimization</h3>
+          <p>Ensures your documents pass automated screening systems.</p>
+        </div>
+        <div class="feature">
+          <h3>Audit & Verify</h3>
+          <p>Validates all claims against your source documents for truth.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  // Client-side form handling with enhanced loading UI
+  const form = document.getElementById('upload-form') as HTMLFormElement;
+  const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+  const errorDiv = document.getElementById('error-message') as HTMLDivElement;
+  const loadingOverlay = document.getElementById('loading-overlay') as HTMLDivElement;
+  const loadingStatus = document.getElementById('loading-status') as HTMLSpanElement;
+  const loadingDetail = document.getElementById('loading-detail') as HTMLParagraphElement;
+
+  const loadingSteps = [
+    { status: 'Reading files...', detail: 'Parsing your job description and resume' },
+    { status: 'Uploading...', detail: 'Sending documents to Hydra' },
+    { status: 'Starting workflow...', detail: 'Initializing the multi-agent pipeline' },
+    { status: 'Redirecting...', detail: 'Taking you to the progress page' },
+  ];
+
+  function updateLoadingStep(step: number) {
+    if (step < loadingSteps.length) {
+      loadingStatus.textContent = loadingSteps[step].status;
+      loadingDetail.textContent = loadingSteps[step].detail;
+
+      // Update visual step indicators
+      const stepElements = document.querySelectorAll('.loading-steps .step');
+      stepElements.forEach((el, i) => {
+        el.classList.toggle('active', i <= step);
+      });
+    }
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    // Show loading overlay
+    errorDiv.style.display = 'none';
+    loadingOverlay.style.display = 'flex';
+    submitBtn.disabled = true;
+    updateLoadingStep(0);
+
+    try {
+      const formData = new FormData(form);
+
+      // Get file contents
+      const jdFile = formData.get('jd') as File;
+      const resumeFile = formData.get('resume') as File;
+      const sourceFiles = formData.getAll('sources') as File[];
+
+      if (!jdFile || jdFile.size === 0) {
+        throw new Error('Job description is required');
+      }
+      if (!resumeFile || resumeFile.size === 0) {
+        throw new Error('Resume is required');
+      }
+
+      // Read file contents
+      updateLoadingStep(0);
+      const jdText = await jdFile.text();
+      const resumeText = await resumeFile.text();
+      const sourcesText = await Promise.all(
+        sourceFiles
+          .filter((f) => f.size > 0)
+          .map(async (f) => `# ${f.name}\n${await f.text()}`)
+      );
+
+      // Create job via API
+      updateLoadingStep(1);
+      const response = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          job_description: jdText,
+          resume: resumeText,
+          source_documents: sourcesText.join('\n\n'),
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(error.message || error.detail || `HTTP ${response.status}`);
+      }
+
+      updateLoadingStep(2);
+      const { job_id } = await response.json();
+
+      // Redirect to job page
+      updateLoadingStep(3);
+      window.location.href = `/jobs/${job_id}`;
+
+    } catch (err) {
+      errorDiv.textContent = err instanceof Error ? err.message : 'An error occurred';
+      errorDiv.style.display = 'block';
+      loadingOverlay.style.display = 'none';
+      submitBtn.disabled = false;
+    }
+  });
+</script>
+
+<style>
+  .upload-page {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .subtitle {
+    color: var(--color-text-muted);
+    margin-bottom: 2rem;
+    font-size: 1.1rem;
+  }
+
+  .upload-form {
+    margin-bottom: 3rem;
+  }
+
+  .form-actions {
+    margin-top: 1.5rem;
+  }
+
+  .form-actions button {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.1rem;
+  }
+
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    color: var(--color-text-muted);
+    margin-top: 1rem;
+  }
+
+  .spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--color-border);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .error {
+    margin-top: 1rem;
+  }
+
+  .features {
+    margin-top: 3rem;
+  }
+
+  .features h2 {
+    margin-bottom: 1.5rem;
+  }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .feature {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+  }
+
+  .feature h3 {
+    color: var(--color-primary);
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .feature p {
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    margin: 0;
+  }
+
+  /* Loading overlay styles */
+  .loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+  }
+
+  .loading-content {
+    text-align: center;
+    color: white;
+    max-width: 400px;
+    padding: 2rem;
+  }
+
+  .loading-content h2 {
+    margin: 1.5rem 0 0.5rem;
+    font-size: 1.5rem;
+    color: white;
+  }
+
+  .loading-content p {
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0;
+  }
+
+  .loading-spinner {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    margin: 0 auto;
+  }
+
+  .spinner-ring {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    animation: spin 1.5s linear infinite;
+  }
+
+  .spinner-ring:nth-child(1) {
+    border-top-color: var(--color-primary);
+    animation-delay: 0s;
+  }
+
+  .spinner-ring:nth-child(2) {
+    width: 70%;
+    height: 70%;
+    top: 15%;
+    left: 15%;
+    border-right-color: #60a5fa;
+    animation-delay: 0.15s;
+    animation-direction: reverse;
+  }
+
+  .spinner-ring:nth-child(3) {
+    width: 40%;
+    height: 40%;
+    top: 30%;
+    left: 30%;
+    border-bottom-color: #93c5fd;
+    animation-delay: 0.3s;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .loading-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 2rem;
+  }
+
+  .loading-steps .step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    opacity: 0.4;
+    transition: opacity 0.3s;
+  }
+
+  .loading-steps .step.active {
+    opacity: 1;
+  }
+
+  .loading-steps .step.active ~ .step {
+    opacity: 0.4;
+  }
+
+  .step-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transition: all 0.3s;
+  }
+
+  .step.active .step-dot {
+    background: var(--color-primary);
+    box-shadow: 0 0 10px var(--color-primary);
+  }
+
+  .loading-steps .step span:last-child {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .step-line {
+    width: 30px;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.2);
+    margin-bottom: 1.5rem;
+  }
+</style>

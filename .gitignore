@@ -1,49 +1,82 @@
-# Dependencies
-node_modules/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Environment
-.env
-.env.local
-.env.*.local
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
 
-# IDE
-.idea/
+# IDEs
 .vscode/
+.idea/
 *.swp
 *.swo
 *~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Output
+output/
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# CrewAI specific
+.crewai/
+
+# Kiro (keep specs and steering, ignore other Kiro files)
+.kiro/cache/
+.kiro/logs/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Build outputs
-dist/
-build/
-*.log
-
-# Temporary files (NEVER commit these)
-scratch.txt
-*.scratch
+# Temporary files
 *.tmp
-*.temp
-1.hold
+*.bak
+*.swp
 
-# Chat logs and working notes (NEVER commit)
-*-chat-*.md
-chat-*.md
-TASK-*-SUMMARY.md
-IMPLEMENTATION-SUMMARY.md
+# Node
+node_modules/
 
-# Exports and data files
-*.csv
-*.pdf
-*.xlsx
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
 
-# Wrangler (Cloudflare Workers)
-.wrangler/
-
-# Tool state
-.claude-flow/
-.swarm/
-
+# PII and sensitive files
+*[CANDIDATE NAME]*
+.env
+.env.*
