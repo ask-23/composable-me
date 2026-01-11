@@ -26,7 +26,7 @@ from runtime.crewai.agents.tailoring_agent import TailoringAgent
 from runtime.crewai.agents.ats_optimizer import ATSOptimizerAgent
 from runtime.crewai.agents.auditor import AuditorSuiteAgent
 from runtime.crewai.agents.executive_synthesizer import ExecutiveSynthesizerAgent
-from runtime.crewai.base_agent import ValidationError
+from runtime.crewai.base_agent import ValidationError, BaseHydraAgent
 from runtime.crewai.model_config import get_llm_for_agent, get_agent_model_info, LLMClientError
 
 
@@ -138,6 +138,37 @@ class HydraWorkflow:
         except LLMClientError:
             raise ValueError(f"No LLM available for agent '{agent_type}'")
     
+    def _execute_with_fallback(self, agent: BaseHydraAgent, context: Dict[str, Any], stage_name: str) -> Dict[str, Any]:
+        """Execute agent with automatic fallback to secondary model on failure."""
+        try:
+            return agent.execute(context)
+        except Exception as e:
+            self.logger.warning(f"Stage '{stage_name}' failed with primary model: {e}")
+            self._log(f"Primary model failed for {stage_name}, attempting fallback...")
+            
+            try:
+                # Get fallback LLM
+                if self.fallback_llm:
+                    fallback = self.fallback_llm
+                    model_name = getattr(fallback, 'model', 'fallback')
+                else:
+                    # Create a specific fallback for this agent
+                    fallback = get_llm_for_agent(stage_name, fallback_only=True)
+                    model_name = "fallback"
+                
+                # Update agent with fallback LLM
+                agent.llm = fallback
+                self.agent_models[stage_name] = model_name
+                self._log(f"Switched {stage_name} to fallback model: {model_name}")
+                
+                # Retry execution
+                return agent.execute(context)
+                
+            except Exception as fallback_error:
+                self.logger.error(f"Fallback failed for {stage_name}: {fallback_error}")
+                # Raise the original error as it's usually more informative
+                raise e
+
     def execute(self, context: Dict[str, Any]) -> WorkflowResult:
         """
         Execute the complete workflow pipeline
@@ -230,7 +261,7 @@ class HydraWorkflow:
         self.current_state = WorkflowState.GAP_ANALYSIS
         self._log("Executing Gap Analysis")
         
-        result = self.gap_analyzer.execute(context)
+        result = self._execute_with_fallback(self.gap_analyzer, context, "gap_analysis")
         self.intermediate_results["gap_analysis"] = result
         return result
     
@@ -259,7 +290,7 @@ class HydraWorkflow:
             "gap_analysis": gap_result,
             "gaps": gaps if gaps else []  # Provide empty list if no gaps found
         }
-        result = self.interrogator_prepper.execute(interrogation_context)
+        result = self._execute_with_fallback(self.interrogator_prepper, interrogation_context, "interrogation")
         self.intermediate_results["interrogation"] = result
         return result
 
@@ -273,7 +304,7 @@ class HydraWorkflow:
             "gap_analysis": gap_result,
             "interview_notes": interrogation_result.get("interview_notes", "")  # Provide empty string if missing
         }
-        result = self.differentiator.execute(differentiation_context)
+        result = self._execute_with_fallback(self.differentiator, differentiation_context, "differentiation")
         self.intermediate_results["differentiation"] = result
         return result
 
@@ -292,7 +323,7 @@ class HydraWorkflow:
             "differentiation": differentiation_result,
             "differentiators": differentiation_result.get("differentiators", [])
         }
-        result = self.tailoring_agent.execute(tailoring_context)
+        result = self._execute_with_fallback(self.tailoring_agent, tailoring_context, "tailoring")
         self.intermediate_results["tailoring"] = result
         return result
 
@@ -307,7 +338,7 @@ class HydraWorkflow:
             "tailored_cover_letter": tailoring_result.get("tailored_cover_letter", ""),
             "differentiators": self.intermediate_results.get("differentiation", {}).get("differentiators", [])
         }
-        result = self.ats_optimizer.execute(ats_context)
+        result = self._execute_with_fallback(self.ats_optimizer, ats_context, "ats_optimization")
         self.intermediate_results["ats_optimization"] = result
         return result
 
@@ -340,7 +371,7 @@ class HydraWorkflow:
                     "document": current_documents["resume"],
                     "document_type": "resume"
                 }
-                resume_audit = self.auditor_suite.execute(resume_audit_context)
+                resume_audit = self._execute_with_fallback(self.auditor_suite, resume_audit_context, "auditor_suite")
                 last_resume_audit = resume_audit
 
                 # Audit the cover letter if present
@@ -351,7 +382,7 @@ class HydraWorkflow:
                         "document": current_documents["cover_letter"],
                         "document_type": "cover_letter"
                     }
-                    cover_letter_audit = self.auditor_suite.execute(cover_letter_audit_context)
+                    cover_letter_audit = self._execute_with_fallback(self.auditor_suite, cover_letter_audit_context, "auditor_suite")
                     last_cover_letter_audit = cover_letter_audit
 
                 # Check if audit passed - handle both nested and flat structures
@@ -470,7 +501,7 @@ class HydraWorkflow:
                 "audit_report": audit_result.get("audit_report", {}),
             }
             
-            result = self.executive_synthesizer.execute(synthesis_context)
+            result = self._execute_with_fallback(self.executive_synthesizer, synthesis_context, "executive_synthesis")
             self.intermediate_results["executive_synthesis"] = result
             self._log(f"Executive synthesis complete: {result.get('decision', {}).get('recommendation', 'UNKNOWN')}")
             return result
