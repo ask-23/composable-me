@@ -60,13 +60,16 @@ test.describe('Job Progress Page', () => {
         await page.locator('button[type="submit"]').click();
         await expect(page).toHaveURL(/\/jobs\/[a-f0-9-]+/, { timeout: 10000 });
 
-        // Check stage labels exist
-        await expect(page.locator('text=Starting')).toBeVisible();
-        await expect(page.locator('text=Gap Analysis')).toBeVisible();
-        await expect(page.locator('text=Interview Prep')).toBeVisible();
-        await expect(page.locator('text=Tailoring')).toBeVisible();
-        await expect(page.locator('text=ATS Optimization')).toBeVisible();
-        await expect(page.locator('text=Auditing')).toBeVisible();
+        // Wait for page to stabilize after navigation (use domcontentloaded, not networkidle which blocks on SSE)
+        await page.waitForLoadState('domcontentloaded');
+
+        // Check stage labels exist (use exact match to avoid JSON debug content)
+        await expect(page.getByText('Starting', { exact: true }).first()).toBeVisible();
+        await expect(page.getByText('Gap Analysis', { exact: true })).toBeVisible();
+        await expect(page.getByText('Interview Prep', { exact: true })).toBeVisible();
+        await expect(page.getByText('Tailoring', { exact: true }).first()).toBeVisible();
+        await expect(page.getByText('ATS Optimization', { exact: true })).toBeVisible();
+        await expect(page.getByText('Auditing', { exact: true })).toBeVisible();
         await expect(page.getByText('Complete', { exact: true })).toBeVisible();
     });
 
