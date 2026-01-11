@@ -59,13 +59,13 @@ export default defineConfig({
             command: 'cd ../.. && ./web/run.sh backend',
             url: 'http://localhost:8000/health',
             reuseExistingServer: !process.env.CI,
-            timeout: 30000,
+            timeout: 60000,
         },
         {
             command: 'npm run dev',
             url: 'http://localhost:4321',
             reuseExistingServer: !process.env.CI,
-            timeout: 30000,
+            timeout: 60000,
         },
     ],
 });
