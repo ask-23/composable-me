@@ -23,8 +23,9 @@ class TestHydraWorkflow:
              patch('runtime.crewai.hydra_workflow.DifferentiatorAgent'), \
              patch('runtime.crewai.hydra_workflow.TailoringAgent'), \
              patch('runtime.crewai.hydra_workflow.ATSOptimizerAgent'), \
-             patch('runtime.crewai.hydra_workflow.AuditorSuiteAgent'):
-            return HydraWorkflow(mock_llm)
+             patch('runtime.crewai.hydra_workflow.AuditorSuiteAgent'), \
+             patch('runtime.crewai.hydra_workflow.ExecutiveSynthesizerAgent'):
+            return HydraWorkflow(mock_llm, use_per_agent_models=False)
     
     @pytest.fixture
     def sample_context(self):
@@ -93,9 +94,10 @@ class TestHydraWorkflow:
              patch('runtime.crewai.hydra_workflow.DifferentiatorAgent'), \
              patch('runtime.crewai.hydra_workflow.TailoringAgent'), \
              patch('runtime.crewai.hydra_workflow.ATSOptimizerAgent'), \
-             patch('runtime.crewai.hydra_workflow.AuditorSuiteAgent'):
-            workflow = HydraWorkflow(mock_llm, max_audit_retries=3)
-            assert workflow.llm == mock_llm
+             patch('runtime.crewai.hydra_workflow.AuditorSuiteAgent'), \
+             patch('runtime.crewai.hydra_workflow.ExecutiveSynthesizerAgent'):
+            workflow = HydraWorkflow(mock_llm, max_audit_retries=3, use_per_agent_models=False)
+            assert workflow.fallback_llm == mock_llm
             assert workflow.max_audit_retries == 3
             assert workflow.current_state == WorkflowState.INITIALIZED
             assert workflow.execution_log == []
