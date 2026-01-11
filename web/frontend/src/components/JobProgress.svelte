@@ -20,7 +20,9 @@
 
   let { jobId, initialState = "initialized", onComplete }: Props = $props();
 
-  let state = $state<JobState>(initialState);
+  // Extract initial value from prop to avoid state_referenced_locally warning
+  const startState = initialState;
+  let state = $state<JobState>(startState);
   let progress = $state(0);
   let logs = $state<string[]>([]);
   let error = $state<string | null>(null);
