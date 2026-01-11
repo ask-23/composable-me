@@ -21,25 +21,29 @@
 
     let { jobId, initialJob }: Props = $props();
 
-    // Track completion state reactively
-    let isComplete = $state(
-        initialJob.state === "completed" || initialJob.state === "failed",
-    );
-    let finalDocuments = $state<FinalDocuments | undefined>(
-        initialJob.final_documents,
-    );
-    let auditReport = $state<AuditReport | undefined>(initialJob.audit_report);
-    let executiveBrief = $state<ExecutiveBrief | undefined>(
-        initialJob.executive_brief,
-    );
-    let intermediateResults = $state<Record<string, unknown>>(
-        initialJob.intermediate_results || {},
-    );
-    let auditFailed = $state(initialJob.audit_failed);
-    let auditError = $state<string | undefined>(initialJob.audit_error);
-    let agentModels = $state<Record<string, string>>(
-        initialJob.agent_models || {},
-    );
+    // Extract initial values from props (avoids state_referenced_locally warnings)
+    // These are intentionally one-time captures - SSE events update the state later
+    const initialState = initialJob.state;
+    const initialComplete =
+        initialState === "completed" || initialState === "failed";
+    const initialDocs = initialJob.final_documents;
+    const initialAudit = initialJob.audit_report;
+    const initialBrief = initialJob.executive_brief;
+    const initialIntermediate = initialJob.intermediate_results || {};
+    const initialAuditFailed = initialJob.audit_failed;
+    const initialAuditError = initialJob.audit_error;
+    const initialModels = initialJob.agent_models || {};
+
+    // Track completion state reactively - we capture initial values and update via SSE
+    let isComplete = $state(initialComplete);
+    let finalDocuments = $state<FinalDocuments | undefined>(initialDocs);
+    let auditReport = $state<AuditReport | undefined>(initialAudit);
+    let executiveBrief = $state<ExecutiveBrief | undefined>(initialBrief);
+    let intermediateResults =
+        $state<Record<string, unknown>>(initialIntermediate);
+    let auditFailed = $state(initialAuditFailed);
+    let auditError = $state<string | undefined>(initialAuditError);
+    let agentModels = $state<Record<string, string>>(initialModels);
 
     function handleComplete(event: SSECompleteEvent) {
         isComplete = true;
