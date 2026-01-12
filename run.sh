@@ -22,7 +22,7 @@ cd "$SCRIPT_DIR"
 # Choose provider + model based on available keys (matches runtime/crewai/llm_client.py)
 if [ -n "$TOGETHER_API_KEY" ]; then
     PROVIDER="Together AI"
-    MODEL="${TOGETHER_MODEL:-${OPENROUTER_MODEL:-meta-llama/Llama-3.3-70B-Instruct-Turbo}}"
+    MODEL="${TOGETHER_MODEL:-${OPENROUTER_MODEL:-meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8}}"
 elif [ -n "$CHUTES_API_KEY" ]; then
     PROVIDER="Chutes.ai"
     MODEL="${CHUTES_MODEL:-${OPENROUTER_MODEL:-deepseek-ai/DeepSeek-V3.1}}"

@@ -27,6 +27,11 @@ def test_job_queue_create_job():
 def test_job_queue_list_jobs():
     """Test listing jobs with pagination"""
     queue = JobQueue()
+    
+    # Clear any existing jobs for test isolation (SQLite persists across runs)
+    for job in queue.list_jobs(limit=100):
+        queue.delete_job(job.id)
+    
     # Create 3 jobs
     job1 = queue.create_job("JD1", "R1")
     job2 = queue.create_job("JD2", "R2")

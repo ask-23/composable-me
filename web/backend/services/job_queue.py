@@ -1,13 +1,65 @@
-"""In-memory job queue for tracking workflow execution."""
+"""SQLite-backed job queue for tracking workflow execution.
 
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any, Optional
-from threading import Lock
+Jobs are persisted to disk and survive server restarts.
+SSE event queues remain in-memory (ephemeral by design).
+"""
+
+import json
+import sqlite3
 import uuid
 import asyncio
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+from threading import Lock
+from typing import Any, Optional
 
 from web.backend.models import JobState
+
+
+# Database path - relative to project root
+DB_PATH = Path(__file__).parent.parent / "data" / "jobs.db"
+
+
+def _ensure_db_dir():
+    """Ensure the data directory exists."""
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+
+def _init_db():
+    """Initialize the database schema if needed."""
+    _ensure_db_dir()
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS jobs (
+            id TEXT PRIMARY KEY,
+            state TEXT NOT NULL DEFAULT 'INITIALIZED',
+            success INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            started_at TEXT,
+            completed_at TEXT,
+            job_description TEXT DEFAULT '',
+            resume TEXT DEFAULT '',
+            source_documents TEXT DEFAULT '',
+            model TEXT,
+            max_audit_retries INTEGER DEFAULT 2,
+            final_documents TEXT,
+            audit_report TEXT,
+            executive_brief TEXT,
+            intermediate_results TEXT DEFAULT '{}',
+            execution_log TEXT DEFAULT '[]',
+            error_message TEXT,
+            audit_failed INTEGER DEFAULT 0,
+            audit_error TEXT,
+            agent_models TEXT DEFAULT '{}'
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+# Initialize DB on module load
+_init_db()
 
 
 @dataclass
@@ -38,7 +90,7 @@ class Job:
     audit_error: Optional[str] = None
     agent_models: dict[str, str] = field(default_factory=dict)
 
-    # For SSE updates
+    # For SSE updates (in-memory only, not persisted)
     _event_queue: asyncio.Queue = field(default_factory=asyncio.Queue, repr=False)
 
     def get_progress_percent(self) -> int:
@@ -68,12 +120,79 @@ class Job:
             return None
 
 
+def _serialize_datetime(dt: Optional[datetime]) -> Optional[str]:
+    """Convert datetime to ISO string for storage."""
+    return dt.isoformat() if dt else None
+
+
+def _deserialize_datetime(s: Optional[str]) -> Optional[datetime]:
+    """Convert ISO string back to datetime."""
+    return datetime.fromisoformat(s) if s else None
+
+
+def _job_to_row(job: Job) -> tuple:
+    """Convert Job to database row."""
+    return (
+        job.id,
+        job.state.value,
+        1 if job.success else 0,
+        _serialize_datetime(job.created_at),
+        _serialize_datetime(job.started_at),
+        _serialize_datetime(job.completed_at),
+        job.job_description,
+        job.resume,
+        job.source_documents,
+        job.model,
+        job.max_audit_retries,
+        json.dumps(job.final_documents) if job.final_documents else None,
+        json.dumps(job.audit_report) if job.audit_report else None,
+        json.dumps(job.executive_brief) if job.executive_brief else None,
+        json.dumps(job.intermediate_results),
+        json.dumps(job.execution_log),
+        job.error_message,
+        1 if job.audit_failed else 0,
+        job.audit_error,
+        json.dumps(job.agent_models),
+    )
+
+
+def _row_to_job(row: tuple) -> Job:
+    """Convert database row to Job."""
+    return Job(
+        id=row[0],
+        state=JobState(row[1]),
+        success=bool(row[2]),
+        created_at=_deserialize_datetime(row[3]) or datetime.now(),
+        started_at=_deserialize_datetime(row[4]),
+        completed_at=_deserialize_datetime(row[5]),
+        job_description=row[6] or "",
+        resume=row[7] or "",
+        source_documents=row[8] or "",
+        model=row[9],
+        max_audit_retries=row[10] or 2,
+        final_documents=json.loads(row[11]) if row[11] else None,
+        audit_report=json.loads(row[12]) if row[12] else None,
+        executive_brief=json.loads(row[13]) if row[13] else None,
+        intermediate_results=json.loads(row[14]) if row[14] else {},
+        execution_log=json.loads(row[15]) if row[15] else [],
+        error_message=row[16],
+        audit_failed=bool(row[17]),
+        audit_error=row[18],
+        agent_models=json.loads(row[19]) if row[19] else {},
+    )
+
+
 class JobQueue:
-    """Thread-safe in-memory job storage."""
+    """Thread-safe SQLite-backed job storage."""
 
     def __init__(self):
-        self._jobs: dict[str, Job] = {}
         self._lock = Lock()
+        # In-memory cache for active jobs (for SSE event queues)
+        self._active_jobs: dict[str, Job] = {}
+
+    def _get_conn(self) -> sqlite3.Connection:
+        """Get a database connection."""
+        return sqlite3.connect(str(DB_PATH))
 
     def create_job(
         self,
@@ -95,42 +214,127 @@ class JobQueue:
         )
 
         with self._lock:
-            self._jobs[job_id] = job
+            conn = self._get_conn()
+            try:
+                conn.execute("""
+                    INSERT INTO jobs (
+                        id, state, success, created_at, started_at, completed_at,
+                        job_description, resume, source_documents, model, max_audit_retries,
+                        final_documents, audit_report, executive_brief, intermediate_results,
+                        execution_log, error_message, audit_failed, audit_error, agent_models
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, _job_to_row(job))
+                conn.commit()
+            finally:
+                conn.close()
+            
+            # Cache for SSE events
+            self._active_jobs[job_id] = job
 
         return job
 
     def get_job(self, job_id: str) -> Optional[Job]:
         """Get a job by ID."""
+        # Check cache first (for active SSE connections)
         with self._lock:
-            return self._jobs.get(job_id)
+            if job_id in self._active_jobs:
+                return self._active_jobs[job_id]
+
+        # Fetch from database
+        conn = self._get_conn()
+        try:
+            cursor = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))
+            row = cursor.fetchone()
+            if row:
+                job = _row_to_job(row)
+                with self._lock:
+                    self._active_jobs[job_id] = job
+                return job
+            return None
+        finally:
+            conn.close()
 
     def update_job(self, job_id: str, **kwargs) -> Optional[Job]:
         """Update job fields."""
         with self._lock:
-            job = self._jobs.get(job_id)
-            if job:
-                for key, value in kwargs.items():
-                    if hasattr(job, key):
-                        setattr(job, key, value)
+            job = self._active_jobs.get(job_id)
+            if not job:
+                # Load from DB if not in cache
+                conn = self._get_conn()
+                try:
+                    cursor = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))
+                    row = cursor.fetchone()
+                    if row:
+                        job = _row_to_job(row)
+                        self._active_jobs[job_id] = job
+                finally:
+                    conn.close()
+            
+            if not job:
+                return None
+            
+            # Update in-memory object
+            for key, value in kwargs.items():
+                if hasattr(job, key):
+                    setattr(job, key, value)
+            
+            # Persist to database
+            conn = self._get_conn()
+            try:
+                conn.execute("""
+                    UPDATE jobs SET
+                        state = ?, success = ?, started_at = ?, completed_at = ?,
+                        final_documents = ?, audit_report = ?, executive_brief = ?,
+                        intermediate_results = ?, execution_log = ?, error_message = ?,
+                        audit_failed = ?, audit_error = ?, agent_models = ?
+                    WHERE id = ?
+                """, (
+                    job.state.value,
+                    1 if job.success else 0,
+                    _serialize_datetime(job.started_at),
+                    _serialize_datetime(job.completed_at),
+                    json.dumps(job.final_documents) if job.final_documents else None,
+                    json.dumps(job.audit_report) if job.audit_report else None,
+                    json.dumps(job.executive_brief) if job.executive_brief else None,
+                    json.dumps(job.intermediate_results),
+                    json.dumps(job.execution_log),
+                    job.error_message,
+                    1 if job.audit_failed else 0,
+                    job.audit_error,
+                    json.dumps(job.agent_models),
+                    job_id,
+                ))
+                conn.commit()
+            finally:
+                conn.close()
+            
             return job
 
     def list_jobs(self, limit: int = 10, offset: int = 0) -> list[Job]:
         """List jobs with pagination."""
-        with self._lock:
-            jobs = sorted(
-                self._jobs.values(),
-                key=lambda j: j.created_at,
-                reverse=True
+        conn = self._get_conn()
+        try:
+            cursor = conn.execute(
+                "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (limit, offset)
             )
-            return jobs[offset:offset + limit]
+            return [_row_to_job(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
 
     def delete_job(self, job_id: str) -> bool:
         """Delete a job by ID."""
         with self._lock:
-            if job_id in self._jobs:
-                del self._jobs[job_id]
-                return True
-            return False
+            if job_id in self._active_jobs:
+                del self._active_jobs[job_id]
+        
+        conn = self._get_conn()
+        try:
+            cursor = conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
 
 
 # Global job queue instance

@@ -216,17 +216,51 @@ Return valid JSON with this structure:
         # Base validation
         super()._validate_schema(data)
         
-        # Check for decision (required)
-        if "decision" not in data:
+        valid_recommendations = ["STRONG_PROCEED", "PROCEED", "PROCEED_WITH_CAUTION", "PASS"]
+        
+        # Check for decision - can be nested object or flat string
+        decision = data.get("decision")
+        if decision is None:
             raise ValidationError("Executive brief must include 'decision' section")
         
-        decision = data.get("decision", {})
-        if "recommendation" not in decision:
-            raise ValidationError("Decision must include 'recommendation'")
+        # Handle nested structure: {"decision": {"recommendation": "PROCEED", ...}}
+        if isinstance(decision, dict):
+            recommendation = decision.get("recommendation")
+            if recommendation is None:
+                raise ValidationError("Decision must include 'recommendation' field")
+            if recommendation not in valid_recommendations:
+                raise ValidationError(
+                    f"Invalid recommendation: {recommendation}. "
+                    f"Must be one of: {valid_recommendations}"
+                )
+        # Handle flat structure: {"decision": "PROCEED", ...}
+        elif isinstance(decision, str):
+            if decision not in valid_recommendations:
+                raise ValidationError(
+                    f"Invalid decision: {decision}. "
+                    f"Must be one of: {valid_recommendations}"
+                )
+            # Normalize to nested structure for consistency
+            data["decision"] = {"recommendation": decision}
+        else:
+            raise ValidationError(f"Decision must be a dict or string, got: {type(decision).__name__}")
         
-        valid_recommendations = ["STRONG_PROCEED", "PROCEED", "PROCEED_WITH_CAUTION", "PASS"]
-        if decision.get("recommendation") not in valid_recommendations:
-            raise ValidationError(
-                f"Invalid recommendation: {decision.get('recommendation')}. "
-                f"Must be one of: {valid_recommendations}"
-            )
+        # Normalize fit_score into decision object (may be at root level)
+        decision_obj = data["decision"]
+        if "fit_score" not in decision_obj:
+            # Check root level for fit_score
+            root_fit_score = data.get("fit_score")
+            if root_fit_score is not None:
+                decision_obj["fit_score"] = root_fit_score
+            else:
+                # Default to 0 if not found anywhere
+                decision_obj["fit_score"] = 0
+        
+        # Ensure fit_score is a number
+        fit_score = decision_obj.get("fit_score", 0)
+        if isinstance(fit_score, str):
+            try:
+                decision_obj["fit_score"] = int(fit_score.replace("%", ""))
+            except ValueError:
+                decision_obj["fit_score"] = 0
+

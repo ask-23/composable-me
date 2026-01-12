@@ -47,7 +47,7 @@ def get_llm_client(
     
     if together_key:
         # Use Together AI (via LiteLLM)
-        model = model or os.environ.get("TOGETHER_MODEL") or os.environ.get("OPENROUTER_MODEL", "meta-llama/Llama-3.3-70B-Instruct-Turbo")
+        model = model or os.environ.get("TOGETHER_MODEL") or os.environ.get("OPENROUTER_MODEL", "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8")
         
         try:
             # LiteLLM requires together_ai/ prefix for Together AI models
