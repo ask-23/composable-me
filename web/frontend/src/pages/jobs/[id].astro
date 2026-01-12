@@ -34,9 +34,10 @@ try {
 
     {error && (
       <div class="error card">
-        <h2>Error</h2>
-        <p>{error}</p>
-        <a href="/">Go back to upload</a>
+        <div class="error-icon">🔍</div>
+        <h2>Job Not Found</h2>
+        <p>This job may have expired or the server was restarted.</p>
+        <a href="/" class="btn-primary">Start a New Job</a>
       </div>
     )}
 
@@ -107,5 +108,26 @@ try {
 
   .error p {
     margin-bottom: 1rem;
+  }
+  
+  .error-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+  
+  .btn-primary {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: var(--color-primary);
+    color: white;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
   }
 </style>

@@ -206,7 +206,7 @@ func main() {
 		if togetherAPIKey != "" {
 			config.Model = os.Getenv("TOGETHER_MODEL")
 			if config.Model == "" {
-				config.Model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+				config.Model = "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
 			}
 		} else if chutesAPIKey != "" {
 			config.Model = os.Getenv("CHUTES_MODEL")

@@ -24,7 +24,7 @@ AGENT_MODELS: Dict[str, Dict[str, Any]] = {
     "gap_analyzer": {
         "provider": "chutes",
         "model": "deepseek-ai/DeepSeek-V3",
-        "base_url": "https://api.chutes.ai/v1",
+        "base_url": "https://llm.chutes.ai/v1",  # Correct endpoint
         "temperature": 0.3,  # Lower for consistent classification
         "rationale": """
             Task: Extract requirements from JD, map to resume, classify fit.
@@ -35,21 +35,21 @@ AGENT_MODELS: Dict[str, Dict[str, Any]] = {
     
     "ats_optimizer": {
         "provider": "together",
-        "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        "model": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
         "temperature": 0.2,
         "rationale": """
             Task: Keyword extraction, format verification, ATS compatibility.
-            Why Llama: Mechanical task, cost-effective, fast.
+            Why Llama 4 Maverick: MoE efficiency, strong instruction following.
         """
     },
     
     "interrogator_prepper": {
         "provider": "together",
-        "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        "model": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
         "temperature": 0.5,
         "rationale": """
             Task: Generate STAR+ interview questions based on gaps.
-            Why Llama: Template-based generation, adequate quality.
+            Why Llama 4 Maverick: Better reasoning for interview prep.
         """
     },
     
@@ -62,7 +62,7 @@ AGENT_MODELS: Dict[str, Dict[str, Any]] = {
         "provider": "anthropic",
         "model": "claude-sonnet-4-20250514",
         "fallback_provider": "together",
-        "fallback_model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        "fallback_model": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
         "temperature": 0.7,
         "rationale": """
             Task: Find narrative threads, rare skill combos, positioning angles.
@@ -74,7 +74,7 @@ AGENT_MODELS: Dict[str, Dict[str, Any]] = {
         "provider": "anthropic",
         "model": "claude-sonnet-4-20250514",
         "fallback_provider": "together",
-        "fallback_model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        "fallback_model": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
         "temperature": 0.6,
         "rationale": """
             Task: Generate tailored resume and cover letter.
@@ -91,14 +91,14 @@ AGENT_MODELS: Dict[str, Dict[str, Any]] = {
     
     "auditor_suite": {
         "provider": "chutes",
-        "model": "deepseek-ai/DeepSeek-R1",
-        "base_url": "https://api.chutes.ai/v1",
+        "model": "deepseek-ai/DeepSeek-R1-TEE",  # TEE variant for hardware-protected privacy
+        "base_url": "https://llm.chutes.ai/v1",  # Correct endpoint (not api.chutes.ai)
         "fallback_provider": "together",
-        "fallback_model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        "fallback_model": "deepseek-ai/DeepSeek-R1",  # R1 on Together (not Llama)
         "temperature": 0.2,  # Low for consistent verification
         "rationale": """
             Task: 4-part audit — truth, tone, ATS, compliance verification.
-            Why R1: Deep reasoning chains for verification.
+            Why R1-TEE: Deep reasoning chains + hardware-protected privacy.
         """
     },
     
@@ -111,7 +111,7 @@ AGENT_MODELS: Dict[str, Dict[str, Any]] = {
         "provider": "anthropic",
         "model": "claude-sonnet-4-20250514",  # Using Sonnet as Opus may not be available
         "fallback_provider": "together",
-        "fallback_model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        "fallback_model": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
         "temperature": 0.5,
         "rationale": """
             Task: Synthesize ALL agent outputs into strategic executive brief.
@@ -145,7 +145,7 @@ def get_llm_for_agent(agent_type: str, fallback_only: bool = False) -> LLM:
         # Fallback to Llama for unknown agents
         config = {
             "provider": "together",
-            "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            "model": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
             "temperature": 0.5,
         }
     
@@ -175,7 +175,7 @@ def get_llm_for_agent(agent_type: str, fallback_only: bool = False) -> LLM:
     together_key = os.environ.get("TOGETHER_API_KEY")
     if together_key:
         return LLM(
-            model="together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            model="together_ai/meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
             api_key=together_key,
             temperature=temperature,
         )

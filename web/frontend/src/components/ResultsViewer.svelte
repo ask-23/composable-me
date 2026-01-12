@@ -100,7 +100,10 @@
     // Use executive brief if available
     if (executiveBrief?.decision) {
       const decision = executiveBrief.decision;
-      const fitScore = decision.fit_score || 0;
+      // Fallback: fit_score may be in decision, at root, or missing entirely
+      const fitScore = decision.fit_score 
+        ?? (executiveBrief as any).fit_score 
+        ?? 0;
 
       summary.push(`## ${decision.recommendation?.replace(/_/g, " ")}`);
       summary.push("");
