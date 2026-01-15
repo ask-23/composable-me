@@ -86,19 +86,18 @@ AGENT_MODELS: Dict[str, Dict[str, Any]] = {
     
     # ═══════════════════════════════════════════════════════════════════════
     # REASONING TIER — Verification, compliance, deep analysis
-    # Provider: Chutes.ai (DeepSeek R1 with TEE) or fallback
+    # Provider: OpenAI (GPT-5 mini) for reliable verification
     # ═══════════════════════════════════════════════════════════════════════
     
     "auditor_suite": {
-        "provider": "chutes",
-        "model": "deepseek-ai/DeepSeek-R1-TEE",  # TEE variant for hardware-protected privacy
-        "base_url": "https://llm.chutes.ai/v1",  # Correct endpoint (not api.chutes.ai)
+        "provider": "openai",
+        "model": "gpt-4o-mini",  # Compatible with LiteLLM, reliable verification
         "fallback_provider": "together",
-        "fallback_model": "deepseek-ai/DeepSeek-R1",  # R1 on Together (not Llama)
+        "fallback_model": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
         "temperature": 0.2,  # Low for consistent verification
         "rationale": """
             Task: 4-part audit — truth, tone, ATS, compliance verification.
-            Why R1-TEE: Deep reasoning chains + hardware-protected privacy.
+            Why GPT-5 mini: Reliable instruction following, less prone to hallucinating violations.
         """
     },
     
@@ -205,7 +204,7 @@ def _create_llm(provider: str, model: str, temperature: float, config: dict) -> 
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if api_key:
             return LLM(
-                model=model,
+                model=f"anthropic/{model}",  # LiteLLM needs provider prefix
                 api_key=api_key,
                 temperature=temperature,
             )
@@ -229,6 +228,17 @@ def _create_llm(provider: str, model: str, temperature: float, config: dict) -> 
         
         return LLM(
             model=f"together_ai/{model}",
+            api_key=api_key,
+            temperature=temperature,
+        )
+    
+    elif provider == "openai":
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            raise LLMClientError("OPENAI_API_KEY not set")
+        
+        return LLM(
+            model=f"openai/{model}",  # LiteLLM prefix for OpenAI
             api_key=api_key,
             temperature=temperature,
         )

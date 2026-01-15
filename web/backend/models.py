@@ -10,7 +10,9 @@ class JobState(str, Enum):
     """Job execution states matching HydraWorkflow states."""
     INITIALIZED = "initialized"
     GAP_ANALYSIS = "gap_analysis"
+    GAP_ANALYSIS_REVIEW = "gap_analysis_review" # Paused
     INTERROGATION = "interrogation"
+    INTERROGATION_REVIEW = "interrogation_review" # Paused
     DIFFERENTIATION = "differentiation"
     TAILORING = "tailoring"
     ATS_OPTIMIZATION = "ats_optimization"
@@ -40,6 +42,16 @@ class CreateJobResponse(BaseModel):
     job_id: str
     status: str = "queued"
     created_at: datetime
+
+
+class ApproveGapAnalysisRequest(BaseModel):
+    """Request to approve gap analysis and resume workflow."""
+    approved: bool = True
+
+
+class SubmitInterviewAnswersRequest(BaseModel):
+    """Request to submit interview answers and resume workflow."""
+    answers: list[dict[str, Any]] = Field(..., description="List of interview answers")
 
 
 class FinalDocuments(BaseModel):

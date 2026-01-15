@@ -24,7 +24,9 @@ def _map_workflow_state(state: WorkflowState) -> JobState:
     mapping = {
         WorkflowState.INITIALIZED: JobState.INITIALIZED,
         WorkflowState.GAP_ANALYSIS: JobState.GAP_ANALYSIS,
+        WorkflowState.GAP_ANALYSIS_REVIEW: JobState.GAP_ANALYSIS_REVIEW,
         WorkflowState.INTERROGATION: JobState.INTERROGATION,
+        WorkflowState.INTERROGATION_REVIEW: JobState.INTERROGATION_REVIEW,
         WorkflowState.DIFFERENTIATION: JobState.DIFFERENTIATION,
         WorkflowState.TAILORING: JobState.TAILORING,
         WorkflowState.ATS_OPTIMIZATION: JobState.ATS_OPTIMIZATION,
@@ -53,6 +55,9 @@ def _run_workflow_sync(job: Job) -> None:
             "job_description": job.job_description,
             "resume": job.resume,
             "source_documents": job.source_documents,
+            "previous_results": job.intermediate_results,
+            "gap_analysis_approved": job.gap_analysis_approved,
+            "interview_answers": job.interview_answers,
         }
 
         # Execute workflow

@@ -75,6 +75,22 @@ The CLI includes file picker support for easier file selection:
          --out output/
 ```
 
+## Interactive Mode (Human-in-the-Loop)
+
+You can run the workflow in interactive mode to review analysis and answer interview questions in real-time:
+
+```bash
+# Run with interaction enabled
+python -m runtime.crewai.cli \
+    --jd examples/sample_jd.md \
+    --resume examples/sample_resume.md \
+    --interactive
+```
+
+This allows you to:
+1. **Review Gap Analysis:** Approve or reject the agent's findings before proceeding.
+2. **Answer Interview Questions:** Provide specific details for identified gaps, which are then used to tailor the resume.
+
 ## What the System Does
 
 The crew will:

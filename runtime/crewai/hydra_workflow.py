@@ -34,7 +34,9 @@ class WorkflowState(Enum):
     """Workflow execution states"""
     INITIALIZED = "initialized"
     GAP_ANALYSIS = "gap_analysis"
+    GAP_ANALYSIS_REVIEW = "gap_analysis_review" # Pause state
     INTERROGATION = "interrogation"
+    INTERROGATION_REVIEW = "interrogation_review" # Pause state
     DIFFERENTIATION = "differentiation"
     TAILORING = "tailoring"
     ATS_OPTIMIZATION = "ats_optimization"
@@ -60,10 +62,64 @@ class WorkflowResult:
     agent_models: Optional[Dict[str, str]] = None
 
 
+class UserInteraction:
+    """Helper for Human-in-the-Loop interactions"""
+    
+    @staticmethod
+    def ask_yes_no(question: str) -> bool:
+        """Ask a yes/no question via console"""
+        try:
+            while True:
+                response = input(f"\n❓ {question} (y/n): ").lower().strip()
+                if response in ['y', 'yes']:
+                    return True
+                if response in ['n', 'no']:
+                    return False
+        except EOFError:
+            return True # Default to yes in non-interactive environments
+    
+    @staticmethod
+    def conduct_interview(questions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Conduct an interactive interview based on generated questions"""
+        print("\n🎤 STARTING INTERVIEW SESSION")
+        print("=" * 50)
+        print("The agent has identified some gaps or areas needing detail.")
+        print("Please answer the following questions to help tailor your resume.")
+        print("=" * 50)
+        
+        answers = []
+        try:
+            for i, q in enumerate(questions):
+                q_text = q.get("question", "Unknown Question")
+                print(f"\n[{i+1}/{len(questions)}] {q_text}")
+                answer = input("   Your Answer > ").strip()
+                if answer:
+                    answers.append({
+                        "question_id": q.get("id"),
+                        "question_text": q_text,
+                        "answer": answer,
+                        "verified": True,
+                        "source_material": True 
+                    })
+        except EOFError:
+            print("\n⚠️ Input stream closed, skipping remaining questions.")
+        
+        print("\n✅ Interview complete! Proceeding with these details...")
+        return answers
+
+
+class WorkflowPaused(Exception):
+    """Raised when workflow needs to pause for user input"""
+    def __init__(self, state: WorkflowState, message: str):
+        self.state = state
+        self.message = message
+        super().__init__(message)
+
+
 class HydraWorkflow:
     """Orchestrates the complete Composable Me agent pipeline"""
     
-    def __init__(self, llm: LLM = None, max_audit_retries: int = 2, use_per_agent_models: bool = True):
+    def __init__(self, llm: LLM = None, max_audit_retries: int = 2, use_per_agent_models: bool = True, interactive: bool = False):
         """
         Initialize the workflow with all agents
         
@@ -71,10 +127,12 @@ class HydraWorkflow:
             llm: Optional fallback LLM instance (used if per-agent models fail)
             max_audit_retries: Maximum number of audit retry attempts
             use_per_agent_models: If True, use optimized models per agent
+            interactive: If True, enables Human-in-the-Loop features
         """
         self.fallback_llm = llm
         self.max_audit_retries = max_audit_retries
         self.use_per_agent_models = use_per_agent_models
+        self.interactive = interactive
         self.logger = logging.getLogger(__name__)
         
         # Initialize agents with per-agent model assignments
@@ -180,26 +238,56 @@ class HydraWorkflow:
                 - source_documents: User source documents for verification
                 - target_role: The role being applied for
                 - research_data: Optional research data
+                - previous_results: Optional dict of results from previous run (for resuming)
+                - resume_stage: Optional string indicating stage to resume from
+                - gap_analysis_approved: Boolean (for resuming after gap analysis)
+                - interview_answers: List (for resuming after interrogation)
 
         Returns:
-            WorkflowResult with final documents and audit report.
-            Note: success=True even if audit fails/crashes - documents are still usable.
-            Check audit_failed flag to determine if manual review is needed.
+            WorkflowResult. If paused, state will reflect the pause point.
         """
         try:
             self._log("Starting HydraWorkflow execution")
             self._validate_input_context(context)
 
+            # Load previous results if resuming
+            if "previous_results" in context:
+                self.intermediate_results = context["previous_results"]
+                self._log("Loaded intermediate results from previous run")
+
             # Execute pipeline stages
-            gap_result = self._execute_gap_analysis(context)
-            interrogation_result = self._execute_interrogation(context, gap_result)
+            
+            # 1. GAP ANALYSIS
+            if "gap_analysis" in self.intermediate_results:
+                gap_result = self.intermediate_results["gap_analysis"]
+                self._log("Skipping Gap Analysis (already complete)")
+            else:
+                gap_result = self._execute_gap_analysis(context)
+                
+            # 2. INTERROGATION
+            if "interrogation" in self.intermediate_results:
+                interrogation_result = self.intermediate_results["interrogation"]
+                self._log("Skipping Interrogation (already complete)")
+                # Check if we have answers now
+                if "interview_answers" in context and context["interview_answers"]:
+                     interrogation_result["interview_notes"] = context["interview_answers"]
+            else:
+                interrogation_result = self._execute_interrogation(context, gap_result)
+
+            # 3. DIFFERENTIATION
             differentiation_result = self._execute_differentiation(context, gap_result, interrogation_result)
+            
+            # 4. TAILORING
             tailoring_result = self._execute_tailoring(context, gap_result, interrogation_result, differentiation_result)
+            
+            # 5. ATS OPTIMIZATION
             ats_result = self._execute_ats_optimization(context, tailoring_result)
 
+            # 6. AUDIT
             # Execute audit with retry loop (no longer throws exceptions)
             final_result = self._execute_audit_with_retry(context, ats_result)
 
+            # 7. EXECUTIVE SYNTHESIS
             # Execute executive synthesis to create strategic brief
             executive_brief = self._execute_executive_synthesis(
                 context, 
@@ -235,6 +323,18 @@ class HydraWorkflow:
                 agent_models=self.agent_models
             )
 
+        except WorkflowPaused as e:
+            self.current_state = e.state
+            self._log(f"Workflow PAUSED: {e.message}")
+            return WorkflowResult(
+                state=self.current_state,
+                success=True, # It's a successful "pause"
+                execution_log=self.execution_log.copy(),
+                intermediate_results=self.get_intermediate_results(),
+                error_message=e.message, # Use error message field for pause reason
+                agent_models=self.agent_models
+            )
+
         except Exception as e:
             self.current_state = WorkflowState.FAILED
             error_msg = f"Workflow execution failed: {str(e)}"
@@ -263,6 +363,18 @@ class HydraWorkflow:
         
         result = self._execute_with_fallback(self.gap_analyzer, context, "gap_analysis")
         self.intermediate_results["gap_analysis"] = result
+
+        if self.interactive:
+            print("\n📊 GAP ANALYSIS COMPLETE")
+            # Ideally print specific gaps here, but for now just pause
+            if not UserInteraction.ask_yes_no("Proceed with these findings?"):
+                self._log("User aborted after Gap Analysis")
+                raise Exception("User aborted workflow")
+        else:
+            # Web mode: Check for approval in context
+            if not context.get("gap_analysis_approved", False):
+                 raise WorkflowPaused(WorkflowState.GAP_ANALYSIS_REVIEW, "Waiting for Gap Analysis approval")
+
         return result
     
     def _execute_interrogation(self, context: Dict[str, Any], gap_result: Dict[str, Any]) -> Dict[str, Any]:
@@ -292,6 +404,25 @@ class HydraWorkflow:
         }
         result = self._execute_with_fallback(self.interrogator_prepper, interrogation_context, "interrogation")
         self.intermediate_results["interrogation"] = result
+        
+        questions = result.get("questions", [])
+        if not questions:
+            self._log("No questions generated for interview")
+            return result
+
+        if self.interactive:
+            answers = UserInteraction.conduct_interview(questions)
+            # Merge answers into result
+            result["interview_notes"] = answers
+            self._log("User completed interactive interview")
+        else:
+            # Web mode: Check for answers in context
+            if not context.get("interview_answers"):
+                 raise WorkflowPaused(WorkflowState.INTERROGATION_REVIEW, "Waiting for interview answers")
+            
+            # If answers provided, merge them
+            result["interview_notes"] = context["interview_answers"]
+
         return result
 
     def _execute_differentiation(self, context: Dict[str, Any], gap_result: Dict[str, Any], interrogation_result: Dict[str, Any]) -> Dict[str, Any]:
@@ -332,10 +463,15 @@ class HydraWorkflow:
         self.current_state = WorkflowState.ATS_OPTIMIZATION
         self._log("Executing ATS Optimization")
 
+        # Extract tailored content from nested structure
+        tailored_output = tailoring_result.get("tailored_output", {})
+        tailored_resume = tailored_output.get("resume", {})
+        tailored_cover = tailored_output.get("cover_letter", {})
+        
         ats_context = {
             **context,
-            "tailored_resume": tailoring_result.get("tailored_resume", ""),
-            "tailored_cover_letter": tailoring_result.get("tailored_cover_letter", ""),
+            "tailored_resume": tailored_resume.get("content", "") if isinstance(tailored_resume, dict) else str(tailored_resume),
+            "tailored_cover_letter": tailored_cover.get("content", "") if isinstance(tailored_cover, dict) else str(tailored_cover),
             "differentiators": self.intermediate_results.get("differentiation", {}).get("differentiators", [])
         }
         result = self._execute_with_fallback(self.ats_optimizer, ats_context, "ats_optimization")
@@ -354,10 +490,26 @@ class HydraWorkflow:
         self._log("Executing Audit with Retry Logic")
 
         retry_count = 0
+        
+        # Extract documents from nested ATS result structure
+        ats_report = ats_result.get("ats_report", {})
         current_documents = {
-            "resume": ats_result.get("optimized_resume", ""),
-            "cover_letter": ats_result.get("optimized_cover_letter", "")
+            "resume": ats_report.get("optimized_resume", ""),
+            "cover_letter": ats_report.get("optimized_cover_letter", "")
         }
+        
+        # Fallback: if ATS didn't provide optimized version, use tailored from intermediate results
+        if not current_documents["resume"]:
+            tailoring = self.intermediate_results.get("tailoring", {})
+            tailored_output = tailoring.get("tailored_output", {})
+            resume_data = tailored_output.get("resume", {})
+            current_documents["resume"] = resume_data.get("content", "") if isinstance(resume_data, dict) else str(resume_data)
+        
+        if not current_documents["cover_letter"]:
+            tailoring = self.intermediate_results.get("tailoring", {})
+            tailored_output = tailoring.get("tailored_output", {})
+            cover_data = tailored_output.get("cover_letter", {})
+            current_documents["cover_letter"] = cover_data.get("content", "") if isinstance(cover_data, dict) else str(cover_data)
 
         last_error = None
         last_resume_audit = None

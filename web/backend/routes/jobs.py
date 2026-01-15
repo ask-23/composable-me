@@ -17,6 +17,8 @@ from web.backend.models import (
     AuditReport,
     JobState,
     AuditStatus,
+    ApproveGapAnalysisRequest,
+    SubmitInterviewAnswersRequest,
 )
 from web.backend.services.job_queue import job_queue
 from web.backend.services.workflow_runner import start_workflow_background
@@ -50,6 +52,42 @@ class JobsController(Controller):
             status="queued",
             created_at=job.created_at,
         )
+
+    @post("/{job_id:str}/approve_gap_analysis", status_code=HTTP_200_OK)
+    async def approve_gap_analysis(self, job_id: str, data: ApproveGapAnalysisRequest) -> JobResponse:
+        """Approve gap analysis and resume workflow."""
+        job = job_queue.get_job(job_id)
+        if not job:
+            raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Job not found")
+        
+        if job.state != JobState.GAP_ANALYSIS_REVIEW:
+            raise HTTPException(status_code=400, detail=f"Job is not in GAP_ANALYSIS_REVIEW state (current: {job.state})")
+
+        # Update job
+        job_queue.update_job(job_id, gap_analysis_approved=data.approved)
+        
+        # Resume workflow
+        start_workflow_background(job)
+        
+        return await self.get_job(job_id)
+
+    @post("/{job_id:str}/submit_interview_answers", status_code=HTTP_200_OK)
+    async def submit_interview_answers(self, job_id: str, data: SubmitInterviewAnswersRequest) -> JobResponse:
+        """Submit interview answers and resume workflow."""
+        job = job_queue.get_job(job_id)
+        if not job:
+            raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Job not found")
+
+        if job.state != JobState.INTERROGATION_REVIEW:
+            raise HTTPException(status_code=400, detail=f"Job is not in INTERROGATION_REVIEW state (current: {job.state})")
+
+        # Update job
+        job_queue.update_job(job_id, interview_answers=data.answers)
+
+        # Resume workflow
+        start_workflow_background(job)
+
+        return await self.get_job(job_id)
 
     @get("/{job_id:str}", status_code=HTTP_200_OK)
     async def get_job(self, job_id: str) -> JobResponse:

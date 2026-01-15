@@ -63,7 +63,7 @@ def get_llm_client(
     
     elif chutes_key:
         # Use Chutes.ai (OpenAI-compatible)
-        model = model or os.environ.get("CHUTES_MODEL") or os.environ.get("OPENROUTER_MODEL", "deepseek-ai/DeepSeek-V3.1")
+        model = model or os.environ.get("CHUTES_MODEL") or os.environ.get("OPENROUTER_MODEL", "deepseek-ai/DeepSeek-R1-TEE")
         
         try:
             # Chutes uses OpenAI-compatible API - prefix with openai/ for LiteLLM

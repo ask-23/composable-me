@@ -80,3 +80,4 @@ playwright/.cache/
 *Korshak*
 .env
 .env.*
+*.db
