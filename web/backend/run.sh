@@ -9,6 +9,11 @@ if [ -d ".venv" ]; then
     source .venv/bin/activate
 fi
 
+# Source environment variables (API keys)
+if [ -f ".env" ]; then
+    source .env
+fi
+
 # Set PYTHONPATH to include project root
 export PYTHONPATH="${PWD}:${PYTHONPATH}"
 

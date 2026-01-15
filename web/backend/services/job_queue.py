@@ -51,7 +51,9 @@ def _init_db():
             error_message TEXT,
             audit_failed INTEGER DEFAULT 0,
             audit_error TEXT,
-            agent_models TEXT DEFAULT '{}'
+            agent_models TEXT DEFAULT '{}',
+            gap_analysis_approved INTEGER DEFAULT 0,
+            interview_answers TEXT DEFAULT '[]'
         )
     """)
     conn.commit()
@@ -89,6 +91,10 @@ class Job:
     audit_failed: bool = False
     audit_error: Optional[str] = None
     agent_models: dict[str, str] = field(default_factory=dict)
+    
+    # User inputs for resume
+    gap_analysis_approved: bool = False
+    interview_answers: list[dict[str, Any]] = field(default_factory=list)
 
     # For SSE updates (in-memory only, not persisted)
     _event_queue: asyncio.Queue = field(default_factory=asyncio.Queue, repr=False)
@@ -153,6 +159,8 @@ def _job_to_row(job: Job) -> tuple:
         1 if job.audit_failed else 0,
         job.audit_error,
         json.dumps(job.agent_models),
+        1 if job.gap_analysis_approved else 0,
+        json.dumps(job.interview_answers),
     )
 
 
@@ -179,6 +187,8 @@ def _row_to_job(row: tuple) -> Job:
         audit_failed=bool(row[17]),
         audit_error=row[18],
         agent_models=json.loads(row[19]) if row[19] else {},
+        gap_analysis_approved=bool(row[20]) if len(row) > 20 else False,
+        interview_answers=json.loads(row[21]) if len(row) > 21 and row[21] else [],
     )
 
 
@@ -221,8 +231,9 @@ class JobQueue:
                         id, state, success, created_at, started_at, completed_at,
                         job_description, resume, source_documents, model, max_audit_retries,
                         final_documents, audit_report, executive_brief, intermediate_results,
-                        execution_log, error_message, audit_failed, audit_error, agent_models
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        execution_log, error_message, audit_failed, audit_error, agent_models,
+                        gap_analysis_approved, interview_answers
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, _job_to_row(job))
                 conn.commit()
             finally:
@@ -286,7 +297,8 @@ class JobQueue:
                         state = ?, success = ?, started_at = ?, completed_at = ?,
                         final_documents = ?, audit_report = ?, executive_brief = ?,
                         intermediate_results = ?, execution_log = ?, error_message = ?,
-                        audit_failed = ?, audit_error = ?, agent_models = ?
+                        audit_failed = ?, audit_error = ?, agent_models = ?,
+                        gap_analysis_approved = ?, interview_answers = ?
                     WHERE id = ?
                 """, (
                     job.state.value,
@@ -302,6 +314,8 @@ class JobQueue:
                     1 if job.audit_failed else 0,
                     job.audit_error,
                     json.dumps(job.agent_models),
+                    1 if job.gap_analysis_approved else 0,
+                    json.dumps(job.interview_answers),
                     job_id,
                 ))
                 conn.commit()

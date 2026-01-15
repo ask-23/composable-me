@@ -99,6 +99,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enable verbose logging",
     )
+    parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Enable interactive mode (Human-in-the-Loop) for interviews and approvals",
+    )
     return parser
 
 
@@ -204,7 +209,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"❌ LLM configuration error: {err}", file=sys.stderr)
         return 1
 
-    workflow = HydraWorkflow(llm, max_audit_retries=args.max_audit_retries)
+    workflow = HydraWorkflow(llm, max_audit_retries=args.max_audit_retries, interactive=args.interactive)
 
     print("Starting Hydra workflow...\n")
     print(f"Job description: {jd_path}")
