@@ -1,0 +1,41 @@
+# Docker
+.git
+.github
+.venv
+.pytest_cache
+.coverage
+htmlcov
+node_modules
+*.pyc
+__pycache__
+.DS_Store
+.idea
+.vscode
+.claude
+.kilocode
+.kiro
+.serena
+debug_venv
+test-results
+*.log
+*.md
+!README.md
+
+# Test files
+tests/
+web/frontend/tests/
+web/frontend/playwright-report/
+web/frontend/test-results/
+
+# Development
+.husky
+examples/
+docs/
+images/
+inputs/
+output/
+scripts/
+
+# Temp files
+*.tmp
+*.bak

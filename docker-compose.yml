@@ -1,0 +1,46 @@
+# =============================================================================
+# Hydra Docker Compose Configuration
+# =============================================================================
+# Deploy to TrueNAS Scale or any Docker environment
+#
+# Usage:
+#   docker compose up -d
+#
+# Access:
+#   http://YOUR_TRUENAS_IP:4321
+# =============================================================================
+
+services:
+  hydra:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hydra-app
+    restart: unless-stopped
+    ports:
+      - "4321:4321" # Frontend (Astro SSR)
+      - "8000:8000" # Backend API (Litestar)
+    environment:
+      # LLM API Keys (required)
+      - GLM_API_KEY=${GLM_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - CHUTES_API_KEY=${CHUTES_API_KEY}
+      - TOGETHER_API_KEY=${TOGETHER_API_KEY}
+      # Optional
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      # Backend URL for frontend
+      - BACKEND_URL=http://localhost:8000
+    volumes:
+      # Persist job database
+      - hydra_data:/app/web/backend/data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:4321/" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  hydra_data:
+    driver: local
