@@ -104,11 +104,14 @@ class Job:
         stage_progress = {
             JobState.INITIALIZED: 0,
             JobState.GAP_ANALYSIS: 15,
+            JobState.GAP_ANALYSIS_REVIEW: 18,
             JobState.INTERROGATION: 30,
+            JobState.INTERROGATION_REVIEW: 35,
             JobState.DIFFERENTIATION: 45,
             JobState.TAILORING: 60,
             JobState.ATS_OPTIMIZATION: 75,
             JobState.AUDITING: 90,
+            JobState.EXECUTIVE_SYNTHESIS: 95,
             JobState.COMPLETED: 100,
             JobState.FAILED: 100,
         }

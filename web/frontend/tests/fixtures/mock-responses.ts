@@ -19,11 +19,14 @@ import type {
 export const JOB_STATES: JobState[] = [
     'initialized',
     'gap_analysis',
+    'gap_analysis_review',
     'interrogation',
+    'interrogation_review',
     'differentiation',
     'tailoring',
     'ats_optimization',
     'auditing',
+    'executive_synthesis',
     'completed',
 ];
 
@@ -286,11 +289,14 @@ export function generateHappyPathSSEStream(): string[] {
 
     const stages: Array<{ state: JobState; progress: number }> = [
         { state: 'gap_analysis', progress: 15 },
+        { state: 'gap_analysis_review', progress: 18 },
         { state: 'interrogation', progress: 30 },
+        { state: 'interrogation_review', progress: 35 },
         { state: 'differentiation', progress: 45 },
         { state: 'tailoring', progress: 60 },
         { state: 'ats_optimization', progress: 75 },
         { state: 'auditing', progress: 90 },
+        { state: 'executive_synthesis', progress: 95 },
     ];
 
     for (const stage of stages) {

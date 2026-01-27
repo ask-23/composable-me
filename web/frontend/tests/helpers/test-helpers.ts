@@ -159,6 +159,16 @@ export async function mockSSEComplete(page: Page, jobId: string = 'mock-job-123'
 }
 
 /**
+ * Mock SSE stream that stays at a specific state (does not complete)
+ */
+export async function mockSSEAtState(page: Page, state: string, progress: number, jobId: string = 'mock-job-123'): Promise<void> {
+    const events = [
+        mockSSEEvents.connected(state, progress),
+    ];
+    await mockSSEStream(page, { events, jobId });
+}
+
+/**
  * Mock SSE stream that fails with an error
  */
 export async function mockSSEError(
@@ -177,7 +187,9 @@ export async function mockSSEError(
 // ----- File Upload Helpers -----
 
 /**
- * Upload a file to a specified input by name
+ * Upload a file to a specified input by name.
+ * For Svelte 5 components with client:load hydration, we need to ensure
+ * the component is fully interactive before setting files.
  */
 export async function uploadFile(
     page: Page,
@@ -186,13 +198,56 @@ export async function uploadFile(
     filename: string = 'test.md'
 ): Promise<void> {
     const input = page.locator(`input[name="${inputName}"]`);
-    await input.setInputFiles({
-        name: filename,
-        mimeType: 'text/markdown',
-        buffer: Buffer.from(content),
-    });
-    // Dispatch change event to trigger Svelte 5's reactive handler
-    await input.evaluate((el) => el.dispatchEvent(new Event('change', { bubbles: true })));
+    const dropzone = input.locator('xpath=ancestor::div[contains(@class, "dropzone")]');
+
+    // Retry logic for flaky Svelte 5 hydration
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+        attempts++;
+
+        // Click the dropzone first to ensure Svelte's event handlers are connected
+        await dropzone.click();
+        await page.waitForTimeout(50);
+
+        // Set the files
+        await input.setInputFiles({
+            name: filename,
+            mimeType: 'text/markdown',
+            buffer: Buffer.from(content),
+        });
+
+        // Svelte 5 stores event handlers in __change property
+        await input.evaluate((el: HTMLInputElement) => {
+            const svelteHandler = (el as any).__change;
+            if (typeof svelteHandler === 'function') {
+                const event = new Event('change', { bubbles: true });
+                Object.defineProperty(event, 'target', { value: el, writable: false });
+                svelteHandler(event);
+            } else {
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
+
+        // Wait for Svelte's reactivity
+        await page.waitForTimeout(100);
+
+        // Check if the file was uploaded by looking for has-files class
+        const hasFiles = await dropzone.evaluate((el) => el.classList.contains('has-files'));
+        if (hasFiles) {
+            return; // Success!
+        }
+
+        // If this isn't the last attempt, wait a bit before retrying
+        if (attempts < maxAttempts) {
+            await page.waitForTimeout(200);
+        }
+    }
+
+    // If we get here, the upload didn't work after all attempts
+    // Log a warning but don't fail - the test assertions will catch it
+    console.warn(`File upload for ${inputName} may not have succeeded after ${maxAttempts} attempts`);
 }
 
 /**
@@ -222,20 +277,51 @@ export async function uploadAndSubmit(page: Page): Promise<void> {
 
 /**
  * Navigate to job page with mocked responses
+ * Uses ?mock query param to skip SSR and enable client-side fetching
+ * which can be intercepted by Playwright routes
  */
 export async function goToMockedJobPage(
     page: Page,
     options: MockJobOptions & { mockStream?: boolean } = {}
 ): Promise<void> {
-    const { jobId = 'mock-job-123', mockStream = true } = options;
+    const { jobId = 'mock-job-123', mockStream = true, state = 'completed' } = options;
 
     // Setup mocks before navigation
     await mockJobStatus(page, { ...options, jobId });
     if (mockStream) {
-        await mockSSEComplete(page, jobId);
+        // For completed/failed states, use full completion stream
+        // For in-progress states, mock SSE to stay at current state
+        if (state === 'completed' || state === 'failed') {
+            await mockSSEComplete(page, jobId);
+        } else {
+            // Map state to progress percentage
+            const progressMap: Record<string, number> = {
+                initialized: 0,
+                gap_analysis: 15,
+                interrogation: 30,
+                differentiation: 45,
+                tailoring: 60,
+                ats_optimization: 75,
+                auditing: 90,
+            };
+            const progress = progressMap[state] ?? 0;
+            await mockSSEAtState(page, state, progress, jobId);
+        }
     }
 
-    await page.goto(`/jobs/${jobId}`);
+    // Use ?mock to skip SSR fetch and enable client-side mocking
+    await page.goto(`/jobs/${jobId}?mock`);
+
+    // Wait for the page to load the mocked data
+    // For completed jobs, wait for both the success state AND results-viewer
+    // This ensures SSE events have been processed
+    if (state === 'completed') {
+        // Wait for SSE complete event to be processed (sets .agent-card.success)
+        await page.locator('.agent-card.success').waitFor({ state: 'visible', timeout: 10000 });
+        await page.locator('.results-viewer').waitFor({ state: 'visible', timeout: 10000 });
+    } else {
+        await page.locator('.progress-card').waitFor({ state: 'visible', timeout: 10000 });
+    }
 }
 
 /**
