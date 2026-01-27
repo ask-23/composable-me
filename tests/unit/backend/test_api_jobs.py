@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from web.backend.models import JobState
+from web.backend.services.job_queue import job_queue
 
 def test_create_job_success(test_client, mock_workflow_runner):
     """Test successful job creation"""
@@ -54,6 +55,84 @@ def test_get_job_success(test_client, mock_workflow_runner):
     data = response.json()
     assert data["job_id"] == job_id
     assert data["state"] == "initialized"
+
+def test_approve_gap_analysis_allows_resume_from_review_state(test_client, mock_workflow_runner):
+    payload = {
+        "job_description": "Test Job Description (long enough)",
+        "resume": "Test Resume Content (long enough)",
+        "source_documents": "",
+    }
+    create_response = test_client.post("/api/jobs", json=payload)
+    job_id = create_response.json()["job_id"]
+    assert mock_workflow_runner.call_count == 1
+
+    # Move job to the pause state
+    job_queue.update_job(job_id, state=JobState.GAP_ANALYSIS_REVIEW)
+
+    response = test_client.post(
+        f"/api/jobs/{job_id}/approve_gap_analysis",
+        json={"approved": True},
+    )
+    assert response.status_code == 200
+    assert mock_workflow_runner.call_count == 2
+
+def test_approve_gap_analysis_is_idempotent_after_review_state(test_client, mock_workflow_runner):
+    payload = {
+        "job_description": "Test Job Description (long enough)",
+        "resume": "Test Resume Content (long enough)",
+        "source_documents": "",
+    }
+    create_response = test_client.post("/api/jobs", json=payload)
+    job_id = create_response.json()["job_id"]
+    assert mock_workflow_runner.call_count == 1
+
+    # Simulate job already advanced beyond the review state
+    job_queue.update_job(job_id, state=JobState.INTERROGATION)
+
+    response = test_client.post(
+        f"/api/jobs/{job_id}/approve_gap_analysis",
+        json={"approved": True},
+    )
+    assert response.status_code == 200
+    assert mock_workflow_runner.call_count == 1
+
+def test_submit_interview_answers_allows_resume_from_review_state(test_client, mock_workflow_runner):
+    payload = {
+        "job_description": "Test Job Description (long enough)",
+        "resume": "Test Resume Content (long enough)",
+        "source_documents": "",
+    }
+    create_response = test_client.post("/api/jobs", json=payload)
+    job_id = create_response.json()["job_id"]
+    assert mock_workflow_runner.call_count == 1
+
+    job_queue.update_job(job_id, state=JobState.INTERROGATION_REVIEW)
+
+    response = test_client.post(
+        f"/api/jobs/{job_id}/submit_interview_answers",
+        json={"answers": [{"question": "Q1", "answer": "A1"}]},
+    )
+    assert response.status_code == 200
+    assert mock_workflow_runner.call_count == 2
+
+def test_submit_interview_answers_is_idempotent_after_review_state(test_client, mock_workflow_runner):
+    payload = {
+        "job_description": "Test Job Description (long enough)",
+        "resume": "Test Resume Content (long enough)",
+        "source_documents": "",
+    }
+    create_response = test_client.post("/api/jobs", json=payload)
+    job_id = create_response.json()["job_id"]
+    assert mock_workflow_runner.call_count == 1
+
+    job_queue.update_job(job_id, state=JobState.DIFFERENTIATION)
+
+    response = test_client.post(
+        f"/api/jobs/{job_id}/submit_interview_answers",
+        json={"answers": [{"question": "Q1", "answer": "A1"}]},
+    )
+    assert response.status_code == 200
+    assert mock_workflow_runner.call_count == 1
 
 @pytest.mark.asyncio
 async def test_job_stream_exists(test_client):
