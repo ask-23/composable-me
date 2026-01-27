@@ -24,6 +24,26 @@ from web.backend.services.job_queue import job_queue
 from web.backend.services.workflow_runner import start_workflow_background
 
 
+_STATE_ORDER: dict[JobState, int] = {
+    JobState.INITIALIZED: 0,
+    JobState.GAP_ANALYSIS: 1,
+    JobState.GAP_ANALYSIS_REVIEW: 2,
+    JobState.INTERROGATION: 3,
+    JobState.INTERROGATION_REVIEW: 4,
+    JobState.DIFFERENTIATION: 5,
+    JobState.TAILORING: 6,
+    JobState.ATS_OPTIMIZATION: 7,
+    JobState.AUDITING: 8,
+    JobState.EXECUTIVE_SYNTHESIS: 9,
+    JobState.COMPLETED: 10,
+    JobState.FAILED: 11,
+}
+
+
+def _is_after_state(current: JobState, target: JobState) -> bool:
+    return _STATE_ORDER.get(current, -1) > _STATE_ORDER.get(target, -1)
+
+
 class JobsController(Controller):
     """Controller for job management endpoints."""
 
@@ -61,6 +81,13 @@ class JobsController(Controller):
             raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Job not found")
         
         if job.state != JobState.GAP_ANALYSIS_REVIEW:
+            # Idempotency: if user clicks twice or UI is stale, treat "already advanced" as a no-op.
+            if _is_after_state(job.state, JobState.GAP_ANALYSIS_REVIEW):
+                return {
+                    "job_id": job_id,
+                    "status": "noop",
+                    "message": "Job already advanced past GAP_ANALYSIS_REVIEW",
+                }
             raise HTTPException(status_code=400, detail=f"Job is not in GAP_ANALYSIS_REVIEW state (current: {job.state})")
 
         # Update job
@@ -70,6 +97,7 @@ class JobsController(Controller):
         start_workflow_background(job)
         
         return {"job_id": job_id, "status": "approved", "message": "Gap analysis approved, workflow resumed"}
+
     @post("/{job_id:str}/submit_interview_answers", status_code=HTTP_200_OK)
     async def submit_interview_answers(self, job_id: str, data: SubmitInterviewAnswersRequest) -> dict:
         """Submit interview answers and resume workflow."""
@@ -78,6 +106,12 @@ class JobsController(Controller):
             raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Job not found")
 
         if job.state != JobState.INTERROGATION_REVIEW:
+            if _is_after_state(job.state, JobState.INTERROGATION_REVIEW):
+                return {
+                    "job_id": job_id,
+                    "status": "noop",
+                    "message": "Job already advanced past INTERROGATION_REVIEW",
+                }
             raise HTTPException(status_code=400, detail=f"Job is not in INTERROGATION_REVIEW state (current: {job.state})")
 
         # Update job
