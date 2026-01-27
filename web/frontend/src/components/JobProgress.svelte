@@ -6,6 +6,7 @@
 
   import {
     STAGES,
+    UI_STAGES,
     STAGE_INFO,
     type JobState,
     type SSEProgressEvent,
@@ -15,15 +16,26 @@
   interface Props {
     jobId: string;
     initialState?: JobState;
+    initialProgress?: number;
     onComplete?: (event: SSECompleteEvent) => void;
+    onStateChange?: (state: JobState) => void;
+    onStageComplete?: (stage: string, result: Record<string, unknown>) => void;
   }
 
-  let { jobId, initialState = "initialized", onComplete }: Props = $props();
+  let {
+    jobId,
+    initialState = "initialized",
+    initialProgress = 0,
+    onComplete,
+    onStateChange,
+    onStageComplete,
+  }: Props = $props();
 
-  // Extract initial value from prop to avoid state_referenced_locally warning
+  // Extract initial values from props to avoid state_referenced_locally warning
   const startState = initialState;
+  const startProgress = initialProgress;
   let state = $state<JobState>(startState);
-  let progress = $state(0);
+  let progress = $state(startProgress);
   let logs = $state<string[]>([]);
   let error = $state<string | null>(null);
   let isConnected = $state(false);
@@ -33,8 +45,18 @@
   // Timer for elapsed time
   let timerInterval: ReturnType<typeof setInterval> | null = null;
 
+  // Map current state to UI display stage (review states map to their parent stage)
+  function getDisplayState(s: JobState): JobState {
+    if (s === 'gap_analysis_review') return 'gap_analysis';
+    if (s === 'interrogation_review') return 'interrogation';
+    if (s === 'executive_synthesis') return 'auditing'; // Show as still in auditing phase
+    if (s === 'differentiation') return 'interrogation'; // Diff runs after interrogation, before tailoring
+    return s;
+  }
+
   // Derived values
-  let currentStageIndex = $derived(STAGES.indexOf(state));
+  let displayState = $derived(getDisplayState(state));
+  let currentStageIndex = $derived(UI_STAGES.indexOf(displayState));
   let stageInfo = $derived(STAGE_INFO[state]);
   let isComplete = $derived(state === "completed" || state === "failed");
   let elapsedTime = $derived(formatTime(elapsedSeconds));
@@ -68,6 +90,11 @@
     }
   });
 
+  // Monitor state changes and notify parent
+  $effect(() => {
+    onStateChange?.(state);
+  });
+
   // SSE connection effect
   $effect(() => {
     if (isComplete) return;
@@ -99,6 +126,7 @@
     eventSource.addEventListener("stage_complete", (e) => {
       const data = JSON.parse(e.data);
       logs = [...logs, `Stage completed: ${data.stage}`];
+      onStageComplete?.(data.stage, data.result);
     });
 
     eventSource.addEventListener("complete", (e) => {
@@ -170,7 +198,7 @@
 
   <!-- Stage indicators -->
   <div class="stages">
-    {#each STAGES as stageName, i}
+    {#each UI_STAGES as stageName, i}
       <div
         class="stage"
         class:active={i === currentStageIndex && !isComplete}

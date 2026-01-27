@@ -1,7 +1,7 @@
 # Composable Me Hydra - Python Dependencies
 
 # Core orchestration
-crewai>=0.86.0
+crewai[anthropic]>=0.86.0
 crewai-tools>=0.17.0
 
 # LLM providers
