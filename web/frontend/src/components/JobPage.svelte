@@ -79,11 +79,49 @@
         }
     });
 
-    // Helper logging for debugging
-    $effect(() => {
-        console.log("JobPage State:", currentState);
-        console.log("Intermediate Results:", intermediateResults);
-    });
+    /**
+     * refreshJob - Fetch latest job state from API and update local state
+     * Used after HITL actions to ensure state is current even if SSE drops
+     */
+    async function refreshJob(): Promise<void> {
+        try {
+            const response = await fetch(`/api/jobs/${jobId}`);
+            if (response.ok) {
+                const latestJob: Job = await response.json();
+                // Update all state from fresh API response
+                currentState = latestJob.state;
+                isComplete = latestJob.state === "completed" || latestJob.state === "failed";
+                finalDocuments = latestJob.final_documents;
+                auditReport = latestJob.audit_report;
+                executiveBrief = latestJob.executive_brief;
+                intermediateResults = latestJob.intermediate_results || {};
+                auditFailed = latestJob.audit_failed;
+                auditError = latestJob.audit_error;
+                agentModels = latestJob.agent_models || {};
+                job = latestJob;
+            }
+        } catch (e) {
+            console.error("Failed to refresh job state:", e);
+        }
+    }
+
+    /**
+     * pollForStateChange - Poll API until state changes from current review state
+     * Implements bounded condition-based waiting with max attempts
+     */
+    async function pollForStateChange(fromState: JobState, maxAttempts = 10, intervalMs = 500): Promise<void> {
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            await refreshJob();
+            if (currentState !== fromState) {
+                // State changed - polling successful
+                return;
+            }
+            // Wait before next poll
+            await new Promise(r => setTimeout(r, intervalMs));
+        }
+        // Max attempts reached - state may not have changed yet, but we stop polling
+        console.warn(`Polling stopped after ${maxAttempts} attempts - state still: ${currentState}`);
+    }
 
     function handleStateChange(newState: JobState) {
         currentState = newState;
@@ -150,16 +188,18 @@
     <GapAnalysisReview
         {jobId}
         gapAnalysis={intermediateResults.gap_analysis as GapAnalysisResult}
-        onApprove={() => {
-            // State update will come via SSE
+        onApprove={async () => {
+            // Poll for state change after approval (HITL resilience)
+            await pollForStateChange("gap_analysis_review");
         }}
     />
 {:else if currentState === "interrogation_review"}
     <InterviewReview
         {jobId}
         interviewPrep={intermediateResults.interrogation as InterrogationResult}
-        onSubmit={() => {
-            /* State update comes via SSE */
+        onSubmit={async () => {
+            // Poll for state change after submit (HITL resilience)
+            await pollForStateChange("interrogation_review");
         }}
     />
 {/if}
