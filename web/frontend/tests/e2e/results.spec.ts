@@ -17,10 +17,11 @@ test.describe('Results Viewer', () => {
     // Note: This requires a working backend with fast processing
     // In CI, you might want to mock the backend or use fixtures
 
-    test('completed job shows results tabs', async ({ page }) => {
+    test.skip('completed job shows results tabs', async ({ page }) => {
+        // SKIP: This integration test requires a real backend with LLM processing
+        // which is slow and may not be available in CI. Enable when testing locally
+        // with a running backend that can process LLM requests.
         test.slow(); // Increase timeout to 3x for LLM workflow completion
-        // This test is skipped by default as it requires full workflow completion
-        // Unskip when running against a real backend with fast processing
 
         await page.goto('/');
 
@@ -40,12 +41,11 @@ test.describe('Results Viewer', () => {
         await expect(page).toHaveURL(/\/jobs\/[a-f0-9-]+/, { timeout: 10000 });
 
         // Wait for job to complete (this could take a while)
-        await expect(page.getByText('Mission Accomplished'))
+        await expect(page.getByText('Your Application Materials Are Ready'))
             .toBeVisible({ timeout: 120000 });
 
         // Check completion message is visible
-        await expect(page.getByText('Mission Accomplished')).toBeVisible();
-        await expect(page.getByText('Your application materials are ready')).toBeVisible();
+        await expect(page.getByText('Your Application Materials Are Ready')).toBeVisible();
     });
 
     test('error state shows error message', async ({ page }) => {
@@ -210,7 +210,8 @@ test.describe('Results Viewer - Verdict Badges', () => {
         });
         await mockSSEComplete(page, jobId);
 
-        await page.goto(`/jobs/${jobId}`);
+        await page.goto(`/jobs/${jobId}?mock`);
+        await page.locator('.results-viewer').waitFor({ state: 'visible', timeout: 10000 });
 
         // TLDR hero should have success class
         await expect(page.locator('.tldr-hero.success')).toBeVisible();
@@ -225,11 +226,14 @@ test.describe('Results Viewer - Verdict Badges', () => {
             overrides: {
                 final_documents: mockFinalDocuments,
                 audit_report: mockAuditReportRejected,
+                // No executive_brief so verdict falls back to audit status
+                executive_brief: undefined,
             },
         });
         await mockSSEComplete(page, jobId);
 
-        await page.goto(`/jobs/${jobId}`);
+        await page.goto(`/jobs/${jobId}?mock`);
+        await page.locator('.results-viewer').waitFor({ state: 'visible', timeout: 10000 });
 
         // TLDR hero should have error class
         await expect(page.locator('.tldr-hero.error')).toBeVisible();
@@ -245,11 +249,15 @@ test.describe('Results Viewer - Verdict Badges', () => {
                 final_documents: mockFinalDocuments,
                 audit_failed: true,
                 audit_error: 'Audit did not complete successfully',
+                // No executive_brief or audit_report so verdict falls back to audit_failed
+                executive_brief: undefined,
+                audit_report: undefined,
             },
         });
         await mockSSEComplete(page, jobId);
 
-        await page.goto(`/jobs/${jobId}`);
+        await page.goto(`/jobs/${jobId}?mock`);
+        await page.locator('.results-viewer').waitFor({ state: 'visible', timeout: 10000 });
 
         // TLDR hero should have warning class
         await expect(page.locator('.tldr-hero.warning')).toBeVisible();
@@ -281,7 +289,8 @@ test.describe('Results Viewer - Audit Panel', () => {
         });
         await mockSSEComplete(page, jobId);
 
-        await page.goto(`/jobs/${jobId}`);
+        await page.goto(`/jobs/${jobId}?mock`);
+        await page.locator('.results-viewer').waitFor({ state: 'visible', timeout: 10000 });
 
         // Go to Audit tab
         await page.locator('.tab').filter({ hasText: 'Audit' }).click();
@@ -304,7 +313,8 @@ test.describe('Results Viewer - Audit Panel', () => {
         });
         await mockSSEComplete(page, jobId);
 
-        await page.goto(`/jobs/${jobId}`);
+        await page.goto(`/jobs/${jobId}?mock`);
+        await page.locator('.results-viewer').waitFor({ state: 'visible', timeout: 10000 });
 
         // Go to Audit tab
         await page.locator('.tab').filter({ hasText: 'Audit' }).click();
