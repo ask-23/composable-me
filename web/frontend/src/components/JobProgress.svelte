@@ -130,13 +130,21 @@
     });
 
     eventSource.addEventListener("complete", (e) => {
-      const data: SSECompleteEvent = JSON.parse(e.data);
-      state = data.state as JobState;
+      const data: SSECompleteEvent = JSON.parse((e as MessageEvent).data);
+      const nextState = data.state as JobState;
+
+      state = nextState;
+
+      const terminal = nextState === "completed" || nextState === "failed";
+      if (!terminal) {
+        // Defensive: backend shouldn't send complete for pause states; keep SSE alive.
+        return;
+      }
+
       progress = 100;
       if (data.agent_models) agent_models = data.agent_models;
 
-      // Capture error message if job failed
-      if (data.state === "failed" && data.error_message) {
+      if (nextState === "failed" && data.error_message) {
         error = data.error_message;
       }
 
