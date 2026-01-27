@@ -17,6 +17,7 @@ class JobState(str, Enum):
     TAILORING = "tailoring"
     ATS_OPTIMIZATION = "ats_optimization"
     AUDITING = "auditing"
+    EXECUTIVE_SYNTHESIS = "executive_synthesis"
     COMPLETED = "completed"
     FAILED = "failed"
 

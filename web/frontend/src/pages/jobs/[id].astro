@@ -4,23 +4,27 @@ import JobPage from '../../components/JobPage.svelte';
 import type { Job } from '../../lib/types';
 
 const { id } = Astro.params;
+const url = new URL(Astro.request.url);
+const skipSSR = url.searchParams.has('mock');
 
-// Fetch initial job state from backend
+// Fetch initial job state from backend (skip for client-side-only mode used in tests)
 const BACKEND_URL = import.meta.env.BACKEND_URL || 'http://localhost:8000';
 let job: Job | null = null;
 let error: string | null = null;
 
-try {
-  const response = await fetch(`${BACKEND_URL}/api/jobs/${id}`);
-  if (response.ok) {
-    job = await response.json();
-  } else if (response.status === 404) {
-    error = 'Job not found';
-  } else {
-    error = `Failed to load job: HTTP ${response.status}`;
+if (!skipSSR) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/jobs/${id}`);
+    if (response.ok) {
+      job = await response.json();
+    } else if (response.status === 404) {
+      error = 'Job not found';
+    } else {
+      error = `Failed to load job: HTTP ${response.status}`;
+    }
+  } catch (e) {
+    error = 'Failed to connect to backend. Is the API server running?';
   }
-} catch (e) {
-  error = 'Failed to connect to backend. Is the API server running?';
 }
 ---
 
@@ -49,7 +53,15 @@ try {
       />
     )}
 
-    {!error && !job && (
+    {/* Client-side only mode for E2E tests with mocked responses */}
+    {!error && !job && skipSSR && (
+      <JobPage
+        client:load
+        jobId={id!}
+      />
+    )}
+
+    {!error && !job && !skipSSR && (
       <div class="loading card">
         <p>Loading job status...</p>
       </div>

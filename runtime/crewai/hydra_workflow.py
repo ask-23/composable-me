@@ -394,7 +394,7 @@ class HydraWorkflow:
             # Also extract requirements classified as gaps
             if "requirements" in analysis:
                 for req in analysis["requirements"]:
-                    if isinstance(req, dict) and req.get("classification") == "gap":
+                    if isinstance(req, dict) and req.get("classification") in ["gap", "blocker"]:
                         gaps.append(req)
         
         interrogation_context = {

@@ -31,6 +31,7 @@ def _map_workflow_state(state: WorkflowState) -> JobState:
         WorkflowState.TAILORING: JobState.TAILORING,
         WorkflowState.ATS_OPTIMIZATION: JobState.ATS_OPTIMIZATION,
         WorkflowState.AUDITING: JobState.AUDITING,
+        WorkflowState.EXECUTIVE_SYNTHESIS: JobState.EXECUTIVE_SYNTHESIS,
         WorkflowState.COMPLETED: JobState.COMPLETED,
         WorkflowState.FAILED: JobState.FAILED,
     }
@@ -155,11 +156,14 @@ async def run_workflow_async(job: Job) -> None:
         # Store agent_models immediately so it's available
         job.agent_models = workflow.agent_models
 
-        # Build context
+        # Build context (include previous results for resuming)
         context = {
             "job_description": job.job_description,
             "resume": job.resume,
             "source_documents": job.source_documents,
+            "previous_results": job.intermediate_results,
+            "gap_analysis_approved": job.gap_analysis_approved,
+            "interview_answers": job.interview_answers,
         }
 
         # Create a future for the workflow execution
