@@ -54,7 +54,7 @@ class JobsController(Controller):
         )
 
     @post("/{job_id:str}/approve_gap_analysis", status_code=HTTP_200_OK)
-    async def approve_gap_analysis(self, job_id: str, data: ApproveGapAnalysisRequest) -> JobResponse:
+    async def approve_gap_analysis(self, job_id: str, data: ApproveGapAnalysisRequest) -> dict:
         """Approve gap analysis and resume workflow."""
         job = job_queue.get_job(job_id)
         if not job:
@@ -69,10 +69,9 @@ class JobsController(Controller):
         # Resume workflow
         start_workflow_background(job)
         
-        return await self.get_job(job_id)
-
+        return {"job_id": job_id, "status": "approved", "message": "Gap analysis approved, workflow resumed"}
     @post("/{job_id:str}/submit_interview_answers", status_code=HTTP_200_OK)
-    async def submit_interview_answers(self, job_id: str, data: SubmitInterviewAnswersRequest) -> JobResponse:
+    async def submit_interview_answers(self, job_id: str, data: SubmitInterviewAnswersRequest) -> dict:
         """Submit interview answers and resume workflow."""
         job = job_queue.get_job(job_id)
         if not job:
@@ -87,10 +86,10 @@ class JobsController(Controller):
         # Resume workflow
         start_workflow_background(job)
 
-        return await self.get_job(job_id)
+        return {"job_id": job_id, "status": "submitted", "message": "Interview answers submitted, workflow resumed"}
 
     @get("/{job_id:str}", status_code=HTTP_200_OK)
-    async def get_job(self, job_id: str) -> JobResponse:
+    def get_job(self, job_id: str) -> JobResponse:
         """Get job status and results."""
         job = job_queue.get_job(job_id)
 
