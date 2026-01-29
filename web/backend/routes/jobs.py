@@ -199,14 +199,7 @@ class JobsController(Controller):
 
             # If already complete, send final state and close
             if job.state in (JobState.COMPLETED, JobState.FAILED):
-                yield _format_sse_event("complete", {
-                    "job_id": job.id,
-                    "success": job.success,
-                    "state": job.state.value,
-                    "final_documents": job.final_documents,
-                    "audit_report": job.audit_report,
-                    "audit_failed": job.audit_failed,
-                })
+                yield _format_sse_event("complete", job.get_complete_event_payload())
                 return
 
             # Stream events until job completes

@@ -60,6 +60,11 @@
   // Timer for elapsed time
   let timerInterval: ReturnType<typeof setInterval> | null = null;
 
+  // Track SSE stream closure separately from isComplete to avoid race condition
+  // where progress event with state="completed" triggers effect cleanup before
+  // the actual "complete" event arrives
+  let sseStreamClosed = $state(false);
+
   // Map current state to UI display stage (review states map to their parent stage)
   function getDisplayState(s: JobState): JobState {
     if (s === 'gap_analysis_review') return 'gap_analysis';
@@ -111,8 +116,11 @@
   });
 
   // SSE connection effect
+  // Uses sseStreamClosed instead of isComplete to avoid race condition:
+  // progress event with state="completed" would make isComplete true,
+  // triggering cleanup before the "complete" event arrives
   $effect(() => {
-    if (isComplete) return;
+    if (sseStreamClosed) return;
 
     const eventSource = new EventSource(`/api/jobs/${jobId}/stream`);
 
@@ -170,6 +178,7 @@
         error = data.error_message;
       }
 
+      sseStreamClosed = true;
       eventSource.close();
       onComplete?.(data);
     });
@@ -192,6 +201,7 @@
       } else {
         error = "An error occurred during processing";
       }
+      sseStreamClosed = true;
       eventSource.close();
     });
 
