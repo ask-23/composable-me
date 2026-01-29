@@ -90,10 +90,10 @@ class JobsController(Controller):
                 }
             raise HTTPException(status_code=400, detail=f"Job is not in GAP_ANALYSIS_REVIEW state (current: {job.state})")
 
-        # Update job
-        job_queue.update_job(job_id, gap_analysis_approved=data.approved)
-        
-        # Resume workflow
+        # Update job and get the updated object (crucial for workflow to see the approval)
+        job = job_queue.update_job(job_id, gap_analysis_approved=data.approved)
+
+        # Resume workflow with updated job
         start_workflow_background(job)
         
         return {"job_id": job_id, "status": "approved", "message": "Gap analysis approved, workflow resumed"}
@@ -114,10 +114,10 @@ class JobsController(Controller):
                 }
             raise HTTPException(status_code=400, detail=f"Job is not in INTERROGATION_REVIEW state (current: {job.state})")
 
-        # Update job
-        job_queue.update_job(job_id, interview_answers=data.answers)
+        # Update job and get the updated object (crucial for workflow to see the answers)
+        job = job_queue.update_job(job_id, interview_answers=data.answers)
 
-        # Resume workflow
+        # Resume workflow with updated job
         start_workflow_background(job)
 
         return {"job_id": job_id, "status": "submitted", "message": "Interview answers submitted, workflow resumed"}
