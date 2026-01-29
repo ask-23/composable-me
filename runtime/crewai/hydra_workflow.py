@@ -407,7 +407,7 @@ class HydraWorkflow:
         
         questions = result.get("questions", [])
         if not questions:
-            self._log("No questions generated for interview")
+            self._log("No interview questions needed (no skill gaps to address)")
             return result
 
         if self.interactive:
@@ -567,16 +567,16 @@ class HydraWorkflow:
                         "audit_error": None
                     }
 
-                # If audit failed and we have retries left
+                # If audit found issues and we have retries left
                 if retry_count < self.max_audit_retries:
                     retry_count += 1
-                    self._log(f"Audit failed, attempting retry {retry_count}/{self.max_audit_retries}")
+                    self._log(f"Audit found issues - applying fixes (attempt {retry_count}/{self.max_audit_retries})")
 
                     # Apply fixes from audit recommendations
                     current_documents = self._apply_audit_fixes(current_documents, resume_audit, cover_letter_audit)
                 else:
                     # Max retries reached - return with REJECTED status instead of crashing
-                    self._log("Max audit retries reached, returning documents with REJECTED status")
+                    self._log("Documents complete but some audit concerns remain (see audit report for details)")
                     return {
                         "final_documents": current_documents,
                         "audit_report": {

@@ -130,6 +130,25 @@ class Job:
         except asyncio.TimeoutError:
             return None
 
+    def get_complete_event_payload(self) -> dict[str, Any]:
+        """Generate the complete event payload (DRY helper for SSE).
+
+        Used by both workflow_runner.py (live completion) and
+        jobs.py (already-complete reconnection) to ensure consistency.
+        """
+        return {
+            "job_id": self.id,
+            "success": self.success,
+            "state": self.state.value,
+            "final_documents": self.final_documents,
+            "audit_report": self.audit_report,
+            "executive_brief": self.executive_brief,
+            "audit_failed": self.audit_failed,
+            "audit_error": self.audit_error,
+            "error_message": self.error_message,
+            "agent_models": self.agent_models,
+        }
+
 
 def _serialize_datetime(dt: Optional[datetime]) -> Optional[str]:
     """Convert datetime to ISO string for storage."""
