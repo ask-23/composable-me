@@ -5,6 +5,7 @@ SSE event queues remain in-memory (ephemeral by design).
 """
 
 import json
+import os
 import sqlite3
 import uuid
 import asyncio
@@ -18,7 +19,8 @@ from web.backend.models import JobState
 
 
 # Database path - relative to project root
-DB_PATH = Path(__file__).parent.parent / "data" / "jobs.db"
+_DEFAULT_DB_PATH = Path(__file__).parent.parent / "data" / "jobs.db"
+DB_PATH = Path(os.environ.get("HYDRA_DB_PATH", str(_DEFAULT_DB_PATH)))
 
 
 def _ensure_db_dir():

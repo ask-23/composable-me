@@ -17,6 +17,7 @@
     jobId: string;
     initialState?: JobState;
     initialProgress?: number;
+    startedAt?: string;
     onComplete?: (event: SSECompleteEvent) => void;
     onStateChange?: (state: JobState) => void;
     onStageComplete?: (stage: string, result: Record<string, unknown>) => void;
@@ -26,6 +27,7 @@
     jobId,
     initialState = "initialized",
     initialProgress = 0,
+    startedAt,
     onComplete,
     onStateChange,
     onStageComplete,
@@ -39,8 +41,21 @@
   let logs = $state<string[]>([]);
   let error = $state<string | null>(null);
   let isConnected = $state(false);
-  let elapsedSeconds = $state(0);
   let agent_models = $state<Record<string, string>>({});
+
+  // Calculate initial elapsed seconds from startedAt prop
+  function getInitialElapsedSeconds(): number {
+    if (!startedAt) return 0;
+    try {
+      const started = new Date(startedAt).getTime();
+      const now = Date.now();
+      return Math.max(0, Math.floor((now - started) / 1000));
+    } catch {
+      return 0;
+    }
+  }
+
+  let elapsedSeconds = $state(getInitialElapsedSeconds());
 
   // Timer for elapsed time
   let timerInterval: ReturnType<typeof setInterval> | null = null;
@@ -106,6 +121,13 @@
       const data = JSON.parse(e.data);
       state = data.state;
       progress = data.progress;
+      if (data.agent_models) agent_models = data.agent_models;
+      // Handle intermediate results from reconnection
+      if (data.intermediate_results) {
+        for (const [stage, result] of Object.entries(data.intermediate_results)) {
+          onStageComplete?.(stage, result as Record<string, unknown>);
+        }
+      }
     });
 
     eventSource.addEventListener("progress", (e) => {
@@ -130,13 +152,21 @@
     });
 
     eventSource.addEventListener("complete", (e) => {
-      const data: SSECompleteEvent = JSON.parse(e.data);
-      state = data.state as JobState;
+      const data: SSECompleteEvent = JSON.parse((e as MessageEvent).data);
+      const nextState = data.state as JobState;
+
+      state = nextState;
+
+      const terminal = nextState === "completed" || nextState === "failed";
+      if (!terminal) {
+        // Defensive: backend shouldn't send complete for pause states; keep SSE alive.
+        return;
+      }
+
       progress = 100;
       if (data.agent_models) agent_models = data.agent_models;
 
-      // Capture error message if job failed
-      if (data.state === "failed" && data.error_message) {
+      if (nextState === "failed" && data.error_message) {
         error = data.error_message;
       }
 

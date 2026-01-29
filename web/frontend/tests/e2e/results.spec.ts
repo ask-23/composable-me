@@ -428,10 +428,8 @@ test.describe('Accessibility', () => {
         await firstTab.focus();
         await expect(firstTab).toBeFocused();
 
-        // Tab to next tab
-        await page.keyboard.press('Tab');
-        const secondTab = page.locator('.tab').nth(1);
-        await expect(secondTab).toBeFocused();
+        // Move to next tab (Arrow keys are the standard + deterministic across browsers)
+        await firstTab.press('ArrowRight');
+        await expect(page.locator('.tab.active')).toContainText('Resume');
     });
 });
-

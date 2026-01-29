@@ -1,0 +1,10 @@
+Company: Depository Trust & Clearing Corporation (DTCC)
+Role: Director of Platform Engineering (Enterprise Scheduling Platform)
+Location: Hybrid – requires 3 days/week onsite in Dallas (Tuesdays, Wednesdays and one other day)
+Employment Type: Full-time
+Salary Range: USD 150k–180k/yr plus benefits and hybrid work model
+
+Summary of responsibilities and qualifications:
+Leads modernization of enterprise scheduling and orchestration platforms in public cloud; oversees adoption of Apache Airflow; manages and grows team of 6–10 engineers; collaborates with application development, data and infrastructure teams; defines scheduling strategy and ensures resiliency and compliance; engages with vendors; travels occasionally for team alignment.
+
+Link: https://www.theladders.com/job/director-platform-engineering-dtcc-dallas-tx
