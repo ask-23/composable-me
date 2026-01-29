@@ -106,6 +106,13 @@
       const data = JSON.parse(e.data);
       state = data.state;
       progress = data.progress;
+      if (data.agent_models) agent_models = data.agent_models;
+      // Handle intermediate results from reconnection
+      if (data.intermediate_results) {
+        for (const [stage, result] of Object.entries(data.intermediate_results)) {
+          onStageComplete?.(stage, result as Record<string, unknown>);
+        }
+      }
     });
 
     eventSource.addEventListener("progress", (e) => {

@@ -193,6 +193,8 @@ class JobsController(Controller):
                 "job_id": job.id,
                 "state": job.state.value,
                 "progress": job.get_progress_percent(),
+                "intermediate_results": job.intermediate_results,
+                "agent_models": job.agent_models,
             })
 
             # If already complete, send final state and close

@@ -1,0 +1,79 @@
+[
+  {
+    "title": "Senior Platform Engineer",
+    "company": "DataBank",
+    "location": "Dallas, TX (Remote)",
+    "workMode": "Remote",
+    "employmentType": "Full‑time",
+    "salaryRange": "$80K – $120K",
+    "description": "Responsible for the design, deployment and optimisation of core systems (monitoring, patching, knowledge‑base administration, logging, change management and special projects).  Acts as a lead engineer for automation projects, building simple OutSystems applications and using Python/PowerShell to automate repeatable tasks.  Maintains core tooling systems, resolves tickets, produces architecture documentation, submits change requests to the change‑advisory board, manages escalations from platform engineers, produces system health reports and implements risk‑management measures【214843338160804†L18-L72】.",
+    "link": "https://www.tealhq.com/job/senior-platform-engineer-remote_11615cb8-1d37-4df7-a5ff-c0adafc7a8d9",
+    "source": "Teal"
+  },
+  {
+    "title": "Lead Platform Engineer (GCP expertise)",
+    "company": "NTT DATA",
+    "location": "Plano, TX (Remote)",
+    "workMode": "Remote",
+    "employmentType": "Full‑time",
+    "salaryRange": null,
+    "description": "Leads the design, provisioning and management of Google Cloud Platform infrastructure using Terraform, focusing on high‑availability architectures.  Configures and maintains networking components (VPCs, subnets, Google Interconnect), manages GCP services (Dataflow, GKE, Cloud Spanner, Pub/Sub, Cloud Run), and implements CI/CD pipelines with Azure Pipelines and ArgoCD.  Handles secrets management, service accounts and IAM roles, collaborates with engineering teams to deliver scalable automated infrastructure and monitors/tunes performance【325155995160404†L18-L70】.",
+    "link": "https://www.tealhq.com/job/lead-platform-engineer-w-gcp-expertise_7ea1af99356a90f1002a9aab354ea301d1b3e",
+    "source": "Teal"
+  },
+  {
+    "title": "Cloud Platform Delivery Lead – GCP: Manager",
+    "company": "PricewaterhouseCoopers (PwC)",
+    "location": "Dallas, TX",
+    "workMode": "Hybrid/Remote",
+    "employmentType": "Full‑time",
+    "salaryRange": "$99K – $232K",
+    "description": "Designs and implements integration solutions and robust platform architectures for clients.  Leads multiple Google Cloud Platform workstreams and manages end‑to‑end delivery of cloud‑migration initiatives.  Designs GCP landing‑zone architectures, tenant‑as‑a‑service capabilities and Kubernetes‑first platforms, and creates infrastructure‑as‑code modules.  Coaches and mentors engineering teams, manages execution risk and technical dependencies, and develops continuous‑delivery pipelines using GitOps practices【595357264480145†L16-L125】.",
+    "link": "https://www.tealhq.com/job/cloud-platform-delivery-lead-gcp-manager_7ea1a2a16a3769a5b58d6021ed3fefe8eaf33",
+    "source": "Teal"
+  },
+  {
+    "title": "Lead Platform Engineer (VMWare)",
+    "company": "Depository Trust & Clearing Corporation (DTCC)",
+    "location": "Dallas, TX",
+    "workMode": "Hybrid (3 days onsite/2 days remote)",
+    "employmentType": "Full‑time",
+    "salaryRange": null,
+    "description": "Drives platform strategy and provides design analysis, documentation, planning and support for private‑cloud infrastructure.  Requires strong experience in server virtualisation (VMware), storage technologies, networking, automation and orchestration.  Responsibilities include providing technical design guidance, collaborating with vendors on architecture issues, creating/updating technical documentation, assisting platform teams with escalations, developing automation strategies and improving stability, security and scalability【611382327476886†L16-L79】.",
+    "link": "https://www.tealhq.com/job/lead-platform-engineer-vm-ware_92739870-25f0-4b90-9173-7cf59dcee85c",
+    "source": "Teal"
+  },
+  {
+    "title": "Lead Platform Engineer",
+    "company": "ReflexAI",
+    "location": "United States (Remote)",
+    "workMode": "Remote",
+    "employmentType": "Full‑time",
+    "salaryRange": null,
+    "description": "Establishes and grows the platform engineering function at a fast‑scaling AI startup.  Architects and owns multicloud infrastructure (GCP and AWS), expands CI/CD and release processes, standardises observability and monitoring, and improves security.  Acts as the first hire on the team, shaping technical vision, mentoring future engineers and partnering with engineering, product and security leadership.  Leads design, automation and maintenance of infrastructure, drives infrastructure‑as‑code adoption, defines Datadog‑based observability and implements secure defaults【460789834580729†L16-L96】.",
+    "link": "https://www.tealhq.com/job/lead-platform-engineer_7ea1a24e89532b345fe46008d0593273a928a",
+    "source": "Teal"
+  },
+  {
+    "title": "Senior Palantir Platform Engineer (Foundry/Gotham)",
+    "company": "NavitsPartners",
+    "location": "Dallas, TX (Remote)",
+    "workMode": "Remote",
+    "employmentType": "Full‑time",
+    "salaryRange": null,
+    "description": "Seeks former Palantir professionals with hands‑on experience delivering production solutions using Palantir Foundry, Gotham or Apollo.  Requires a background in data engineering, software development or platform engineering with a record of building, deploying and shipping real‑world solutions on Palantir platforms.  Candidates must be comfortable owning the full lifecycle from data ingestion through transformation, logic, application and deployment and be able to communicate complex systems to diverse stakeholders【451915968265019†L16-L42】.",
+    "link": "https://www.tealhq.com/job/senior-palantir-platform-engineer-foundry-gotham_7ea1ac15abdb495d8d2c7eb2de67f043ee9ed",
+    "source": "Teal"
+  },
+  {
+    "title": "Director Platform Engineering",
+    "company": "Depository Trust & Clearing Corporation (DTCC)",
+    "location": "Dallas, TX",
+    "workMode": "Hybrid (3 days onsite/2 days remote)",
+    "employmentType": "Full‑time",
+    "salaryRange": "$150K – $180K",
+    "description": "Leads modernisation of DTCC’s enterprise scheduling and orchestration platforms by implementing and managing Apache Airflow in public‑cloud environments.  Oversees a global team of six to ten engineers and promotes an automation‑first culture.  Works with application development, data and infrastructure teams to accelerate cloud transformation, defines scheduling strategy with a focus on resiliency and compliance, manages vendor partnerships and coordinates across multiple locations, including travel for team alignment【47432672051718†L74-L107】【47432672051718†L155-L170】.",
+    "link": "https://www.theladders.com/job/director-platform-engineering-dtcc-dallas-tx_85112422",
+    "source": "Ladders"
+  }
+]

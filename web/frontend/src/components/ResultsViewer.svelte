@@ -33,6 +33,55 @@
 
   type Tab = "summary" | "resume" | "cover_letter" | "audit" | "debug";
   let activeTab = $state<Tab>("summary");
+  const tabs: Tab[] = ["summary", "resume", "cover_letter", "audit", "debug"];
+
+  let tabSummary: HTMLButtonElement | null = null;
+  let tabResume: HTMLButtonElement | null = null;
+  let tabCoverLetter: HTMLButtonElement | null = null;
+  let tabAudit: HTMLButtonElement | null = null;
+  let tabDebug: HTMLButtonElement | null = null;
+
+  function focusTab(tab: Tab) {
+    const el =
+      tab === "summary"
+        ? tabSummary
+        : tab === "resume"
+          ? tabResume
+          : tab === "cover_letter"
+            ? tabCoverLetter
+            : tab === "audit"
+              ? tabAudit
+              : tabDebug;
+    el?.focus();
+  }
+
+  function handleTabKeyDown(e: KeyboardEvent, current: Tab) {
+    const idx = tabs.indexOf(current);
+    if (idx === -1) return;
+
+    let next: Tab | null = null;
+    switch (e.key) {
+      case "ArrowRight":
+        next = tabs[(idx + 1) % tabs.length];
+        break;
+      case "ArrowLeft":
+        next = tabs[(idx - 1 + tabs.length) % tabs.length];
+        break;
+      case "Home":
+        next = tabs[0];
+        break;
+      case "End":
+        next = tabs[tabs.length - 1];
+        break;
+      default:
+        return;
+    }
+
+    e.preventDefault();
+    activeTab = next;
+    // Ensure focus happens after Svelte applies tabindex changes.
+    queueMicrotask(() => focusTab(next));
+  }
 
   // Derived values
   let hasDocuments = $derived(!!documents?.resume || !!documents?.cover_letter);
@@ -212,11 +261,18 @@
   </div>
 
   <!-- Tab navigation -->
-  <div class="tabs">
+  <div class="tabs" role="tablist" aria-label="Results tabs">
     <button
       class="tab"
       class:active={activeTab === "summary"}
       onclick={() => (activeTab = "summary")}
+      role="tab"
+      aria-selected={activeTab === "summary"}
+      tabindex={activeTab === "summary" ? 0 : -1}
+      aria-controls="tab-panel-summary"
+      id="tab-summary"
+      bind:this={tabSummary}
+      onkeydown={(e) => handleTabKeyDown(e, "summary")}
     >
       📋 Summary
     </button>
@@ -224,6 +280,13 @@
       class="tab"
       class:active={activeTab === "resume"}
       onclick={() => (activeTab = "resume")}
+      role="tab"
+      aria-selected={activeTab === "resume"}
+      tabindex={activeTab === "resume" ? 0 : -1}
+      aria-controls="tab-panel-resume"
+      id="tab-resume"
+      bind:this={tabResume}
+      onkeydown={(e) => handleTabKeyDown(e, "resume")}
     >
       📄 Resume
     </button>
@@ -231,6 +294,13 @@
       class="tab"
       class:active={activeTab === "cover_letter"}
       onclick={() => (activeTab = "cover_letter")}
+      role="tab"
+      aria-selected={activeTab === "cover_letter"}
+      tabindex={activeTab === "cover_letter" ? 0 : -1}
+      aria-controls="tab-panel-cover-letter"
+      id="tab-cover-letter"
+      bind:this={tabCoverLetter}
+      onkeydown={(e) => handleTabKeyDown(e, "cover_letter")}
     >
       ✉️ Cover Letter
     </button>
@@ -238,6 +308,13 @@
       class="tab"
       class:active={activeTab === "audit"}
       onclick={() => (activeTab = "audit")}
+      role="tab"
+      aria-selected={activeTab === "audit"}
+      tabindex={activeTab === "audit" ? 0 : -1}
+      aria-controls="tab-panel-audit"
+      id="tab-audit"
+      bind:this={tabAudit}
+      onkeydown={(e) => handleTabKeyDown(e, "audit")}
     >
       🔍 Audit
       <span class="badge {verdict().class}">{auditStatus}</span>
@@ -246,6 +323,13 @@
       class="tab"
       class:active={activeTab === "debug"}
       onclick={() => (activeTab = "debug")}
+      role="tab"
+      aria-selected={activeTab === "debug"}
+      tabindex={activeTab === "debug" ? 0 : -1}
+      aria-controls="tab-panel-debug"
+      id="tab-debug"
+      bind:this={tabDebug}
+      onkeydown={(e) => handleTabKeyDown(e, "debug")}
     >
       🐛 Debug
     </button>
@@ -254,7 +338,12 @@
   <!-- Tab content -->
   <div class="tab-content">
     {#if activeTab === "summary"}
-      <div class="summary-panel">
+      <div
+        class="summary-panel"
+        role="tabpanel"
+        id="tab-panel-summary"
+        aria-labelledby="tab-summary"
+      >
         <div class="executive-summary">
           <h3>Executive Summary</h3>
           <MarkdownViewer content={executiveSummary()} />
@@ -286,7 +375,12 @@
         {/if}
       </div>
     {:else if activeTab === "resume"}
-      <div class="document-panel">
+      <div
+        class="document-panel"
+        role="tabpanel"
+        id="tab-panel-resume"
+        aria-labelledby="tab-resume"
+      >
         <div class="document-header">
           <h3>Tailored Resume</h3>
           {#if documents?.resume}
@@ -307,7 +401,12 @@
         {/if}
       </div>
     {:else if activeTab === "cover_letter"}
-      <div class="document-panel">
+      <div
+        class="document-panel"
+        role="tabpanel"
+        id="tab-panel-cover-letter"
+        aria-labelledby="tab-cover-letter"
+      >
         <div class="document-header">
           <h3>Cover Letter</h3>
           {#if documents?.cover_letter}
@@ -329,7 +428,12 @@
         {/if}
       </div>
     {:else if activeTab === "audit"}
-      <div class="audit-panel">
+      <div
+        class="audit-panel"
+        role="tabpanel"
+        id="tab-panel-audit"
+        aria-labelledby="tab-audit"
+      >
         <h3>Audit Report</h3>
         {#if auditReport}
           <div class="audit-summary">
@@ -379,7 +483,12 @@
         {/if}
       </div>
     {:else if activeTab === "debug"}
-      <div class="debug-panel">
+      <div
+        class="debug-panel"
+        role="tabpanel"
+        id="tab-panel-debug"
+        aria-labelledby="tab-debug"
+      >
         <h3>Intermediate Results</h3>
         {#if intermediateResults && Object.keys(intermediateResults).length > 0}
           {#each Object.entries(intermediateResults) as [stage, result]}
