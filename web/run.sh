@@ -7,7 +7,8 @@ cd "$(dirname "$0")/.." || exit 1
 MODE="${1:-both}"
 
 run_backend() {
-    echo "Starting Litestar backend on http://localhost:8000..."
+    BACKEND_PORT="${HYDRA_BACKEND_PORT:-8000}"
+    echo "Starting Litestar backend on http://localhost:${BACKEND_PORT}..."
     source .venv/bin/activate 2>/dev/null || true
     # Source .env file if it exists to load API keys
     if [ -f .env ]; then
@@ -16,9 +17,17 @@ run_backend() {
         set +a
         echo "Loaded environment from .env"
     fi
+    # Default DB path to a temp location to avoid persisting real inputs into the repo.
+    export HYDRA_DB_PATH="${HYDRA_DB_PATH:-/tmp/hydra-jobs.db}"
     export PYTHONPATH="${PWD}:${PYTHONPATH}"
-    pip install -q litestar uvicorn pydantic python-multipart sse-starlette python-dotenv 2>/dev/null
-    python -m uvicorn web.backend.app:app --host 0.0.0.0 --port 8000 --reload
+    if [ "${HYDRA_SKIP_PIP_INSTALL}" != "1" ]; then
+        pip install -q litestar uvicorn pydantic python-multipart sse-starlette python-dotenv 2>/dev/null
+    fi
+    RELOAD_FLAG="--reload"
+    if [ "${HYDRA_DISABLE_RELOAD}" = "1" ]; then
+        RELOAD_FLAG=""
+    fi
+    python -m uvicorn web.backend.app:app --host 0.0.0.0 --port "${BACKEND_PORT}" ${RELOAD_FLAG}
 }
 
 run_frontend() {

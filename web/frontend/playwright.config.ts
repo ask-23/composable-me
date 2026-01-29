@@ -28,7 +28,7 @@ export default defineConfig({
     /* Shared settings for all projects */
     use: {
         /* Base URL to use in actions like `await page.goto('/')` */
-        baseURL: 'http://localhost:4321',
+        baseURL: 'http://localhost:14321',
 
         /* Collect trace when retrying the failed test */
         trace: 'on-first-retry',
@@ -56,14 +56,14 @@ export default defineConfig({
     /* Run your local dev server before starting the tests */
     webServer: [
         {
-            command: 'cd ../.. && ./web/run.sh backend',
-            url: 'http://localhost:8000/health',
+            command: 'cd ../.. && HYDRA_BACKEND_PORT=18000 HYDRA_DISABLE_RELOAD=1 HYDRA_SKIP_PIP_INSTALL=1 ./web/run.sh backend',
+            url: 'http://localhost:18000/health',
             reuseExistingServer: !process.env.CI,
             timeout: 60000,
         },
         {
-            command: 'npm run dev',
-            url: 'http://localhost:4321',
+            command: 'BACKEND_URL=http://localhost:18000 npm run dev -- --port 14321',
+            url: 'http://localhost:14321',
             reuseExistingServer: !process.env.CI,
             timeout: 60000,
         },

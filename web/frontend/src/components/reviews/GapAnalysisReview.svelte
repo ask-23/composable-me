@@ -17,37 +17,46 @@
     let isSubmitting = $state(false);
     let error = $state<string | null>(null);
 
+    // Get the actual analysis data - handle both flat and nested structures
+    // Backend returns: { agent, gap_analysis: { summary: { fit_score }, requirements: [...] } }
+    let analysisData = $derived(gapAnalysis?.gap_analysis ?? gapAnalysis);
+
     // Derived analysis data - handle both flat and nested structures
     let matchScore = $derived(
-        typeof gapAnalysis?.fit_score === "number"
-            ? gapAnalysis.fit_score
-            : typeof gapAnalysis?.summary?.fit_score === "number"
-              ? gapAnalysis.summary.fit_score
-              : 0,
+        typeof analysisData?.fit_score === "number"
+            ? analysisData.fit_score
+            : typeof analysisData?.summary?.fit_score === "number"
+              ? analysisData.summary.fit_score
+              : typeof gapAnalysis?.fit_score === "number"
+                ? gapAnalysis.fit_score
+                : 0,
     );
 
     // Helper to extract items from analysis
     function getItems(type: "matches" | "gaps" | "adjacent"): string[] {
-        if (!gapAnalysis) return [];
+        if (!analysisData && !gapAnalysis) return [];
+
+        const data = analysisData ?? gapAnalysis;
 
         // 1. Try direct arrays
-        if (type === "matches" && gapAnalysis.matches?.length)
-            return gapAnalysis.matches;
-        if (type === "gaps" && gapAnalysis.gaps?.length)
-            return gapAnalysis.gaps;
-        if (type === "adjacent" && gapAnalysis.adjacent_skills?.length)
-            return gapAnalysis.adjacent_skills;
+        if (type === "matches" && data?.matches?.length)
+            return data.matches;
+        if (type === "gaps" && data?.gaps?.length)
+            return data.gaps;
+        if (type === "adjacent" && data?.adjacent_skills?.length)
+            return data.adjacent_skills;
 
-        // 2. Try parsing requirements list
+        // 2. Try parsing requirements list (check multiple locations)
         const requirements =
-            gapAnalysis.requirements ||
-            gapAnalysis.requirements_analysis?.explicit_required ||
+            data?.requirements ||
+            data?.requirements_analysis?.explicit_required ||
+            gapAnalysis?.requirements ||
             [];
 
         if (!requirements.length) return [];
 
         return requirements
-            .filter((r) => {
+            .filter((r: any) => {
                 const cls = r.classification;
                 if (type === "matches") return cls === "direct_match";
                 if (type === "gaps") return cls === "gap" || cls === "blocker";
@@ -55,7 +64,7 @@
                     return cls === "adjacent" || cls === "adjacent_experience";
                 return false;
             })
-            .map((r) => r.requirement || r.text || JSON.stringify(r)); // Handle potential 'text' field from logs
+            .map((r: any) => r.requirement || r.text || JSON.stringify(r)); // Handle potential 'text' field from logs
     }
 
     let matches = $derived(getItems("matches"));

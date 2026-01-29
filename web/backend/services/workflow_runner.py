@@ -67,16 +67,20 @@ def _run_workflow_sync(job: Job) -> None:
         # Update job with results
         job.state = _map_workflow_state(result.state)
         job.success = result.success
-        job.completed_at = datetime.now()
         job.final_documents = result.final_documents
         job.audit_report = result.audit_report
         job.executive_brief = getattr(result, "executive_brief", None)
-        job.intermediate_results = result.intermediate_results or {}
+        # Merge intermediate results to preserve any that were collected
+        if result.intermediate_results:
+            job.intermediate_results = {**job.intermediate_results, **result.intermediate_results}
         job.execution_log = result.execution_log or []
         job.error_message = result.error_message
         job.audit_failed = getattr(result, "audit_failed", False)
         job.audit_error = getattr(result, "audit_error", None)
         job.agent_models = result.agent_models or {}
+
+        if job.state not in (JobState.GAP_ANALYSIS_REVIEW, JobState.INTERROGATION_REVIEW):
+            job.completed_at = datetime.now()
 
         logger.info(f"Job {job.id} completed: success={job.success}, state={job.state}")
 
@@ -175,7 +179,8 @@ async def run_workflow_async(job: Job) -> None:
         # Poll for state changes while workflow runs
         last_state = None
         last_log_length = 0
-        
+        emitted_stages: set[str] = set()  # Track stages already emitted via SSE
+
         while not future.done():
             await asyncio.sleep(0.5)  # Poll twice per second for responsiveness
             
@@ -203,12 +208,13 @@ async def run_workflow_async(job: Job) -> None:
 
             # Emit intermediate results
             intermediate = workflow.get_intermediate_results()
-            for stage, result in intermediate.items():
-                if stage not in job.intermediate_results:
-                    job.intermediate_results[stage] = result
+            for stage, stage_result in intermediate.items():
+                if stage not in emitted_stages:
+                    emitted_stages.add(stage)
+                    job.intermediate_results[stage] = stage_result
                     await job.emit_event("stage_complete", {
                         "stage": stage,
-                        "result": result,
+                        "result": stage_result,
                     })
 
         # Get the result from the future
@@ -217,11 +223,23 @@ async def run_workflow_async(job: Job) -> None:
         # Update job with results
         job.state = _map_workflow_state(result.state)
         job.success = result.success
-        job.completed_at = datetime.now()
         job.final_documents = result.final_documents
         job.audit_report = result.audit_report
         job.executive_brief = getattr(result, "executive_brief", None)
-        job.intermediate_results = result.intermediate_results or {}
+        # Merge intermediate results - don't overwrite what was collected during polling
+        if result.intermediate_results:
+            job.intermediate_results = {**job.intermediate_results, **result.intermediate_results}
+
+        # Emit stage_complete for any stages not emitted during polling loop.
+        # This handles stages that completed after the final poll but before
+        # future.done() returned True (race condition fix).
+        for stage, stage_result in job.intermediate_results.items():
+            if stage not in emitted_stages:
+                await job.emit_event("stage_complete", {
+                    "stage": stage,
+                    "result": stage_result,
+                })
+
         job.execution_log = result.execution_log or []
         job.error_message = result.error_message
         job.audit_failed = getattr(result, "audit_failed", False)
@@ -230,7 +248,20 @@ async def run_workflow_async(job: Job) -> None:
 
         logger.info(f"Job {job.id} completed: success={job.success}, state={job.state}")
 
-        # Emit completion event
+        # Always emit a final progress update so clients see the final state,
+        # even if the workflow finished between polling intervals.
+        await job.emit_event("progress", {
+            "state": job.state.value,
+            "progress": job.get_progress_percent(),
+            "agent_models": job.agent_models,
+        })
+
+        # Pause states are not terminal: keep SSE stream alive and do not mark completed.
+        if job.state in (JobState.GAP_ANALYSIS_REVIEW, JobState.INTERROGATION_REVIEW):
+            return
+
+        # Terminal-ish: mark completion and emit completion event.
+        job.completed_at = datetime.now()
         await job.emit_event("complete", {
             "job_id": job.id,
             "success": job.success,
