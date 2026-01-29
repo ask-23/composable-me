@@ -262,18 +262,7 @@ async def run_workflow_async(job: Job) -> None:
 
         # Terminal-ish: mark completion and emit completion event.
         job.completed_at = datetime.now()
-        await job.emit_event("complete", {
-            "job_id": job.id,
-            "success": job.success,
-            "state": job.state.value,
-            "final_documents": job.final_documents,
-            "audit_report": job.audit_report,
-            "executive_brief": job.executive_brief,
-            "audit_failed": job.audit_failed,
-            "audit_error": job.audit_error,
-            "error_message": job.error_message,
-            "agent_models": job.agent_models,
-        })
+        await job.emit_event("complete", job.get_complete_event_payload())
 
     except Exception as e:
         logger.error(f"Async workflow failed for job {job.id}: {e}")
