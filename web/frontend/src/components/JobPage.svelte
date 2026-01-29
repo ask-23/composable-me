@@ -79,6 +79,16 @@
         }
     });
 
+    // Defensive: refresh job data when entering review states without intermediate results
+    $effect(() => {
+        if (currentState === "gap_analysis_review" && !intermediateResults.gap_analysis) {
+            refreshJob();
+        }
+        if (currentState === "interrogation_review" && !intermediateResults.interrogation) {
+            refreshJob();
+        }
+    });
+
     /**
      * refreshJob - Fetch latest job state from API and update local state
      * Used after HITL actions to ensure state is current even if SSE drops
