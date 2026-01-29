@@ -3,7 +3,7 @@
  * and interview answer submission.
  */
 
-import type { Job, InterviewAnswer } from '../types';
+import type { InterviewAnswer } from '../types';
 
 const BACKEND_URL = import.meta.env.BACKEND_URL || 'http://localhost:8000';
 
