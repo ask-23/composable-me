@@ -154,6 +154,13 @@
         auditError = event.audit_error;
         agentModels = event.agent_models || {};
 
+        // Defensive: If complete but critical data is missing, refresh from API
+        // This handles edge cases where SSE event was incomplete
+        if (isComplete && !executiveBrief && !finalDocuments) {
+            console.warn("Complete event missing critical data, refreshing from API");
+            refreshJob();
+        }
+
         // Only scroll if we are actually complete
         if (isComplete) {
             setTimeout(() => {
