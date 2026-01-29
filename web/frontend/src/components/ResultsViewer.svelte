@@ -121,25 +121,33 @@
 
   // Extract action items from executive brief or audit report
   let actionItems = $derived(() => {
-    const items: string[] = [];
+    const itemSet = new Set<string>();
 
     // Use executive brief action items if available
     if (executiveBrief?.action_items?.immediate) {
-      items.push(...executiveBrief.action_items.immediate);
+      for (const item of executiveBrief.action_items.immediate) {
+        itemSet.add(item);
+      }
     }
 
-    // Add fallbacks
-    if (auditError) items.push(auditError);
-    if (auditReport?.rejection_reason) items.push(auditReport.rejection_reason);
+    // Add fallbacks (deduplicated via Set)
+    // Only add auditError if different from rejection_reason
+    const rejectionReason = auditReport?.rejection_reason;
+    if (auditError && auditError !== rejectionReason) {
+      itemSet.add(auditError);
+    }
+    if (rejectionReason) {
+      itemSet.add(rejectionReason);
+    }
 
     // Add generic recommendations if nothing else
-    if (items.length === 0 && auditStatus === "APPROVED") {
-      items.push("Your documents are ready to submit!");
-      items.push(
+    if (itemSet.size === 0 && auditStatus === "APPROVED") {
+      itemSet.add("Your documents are ready to submit!");
+      itemSet.add(
         "Consider updating your LinkedIn profile to match your tailored resume",
       );
     }
-    return items;
+    return Array.from(itemSet);
   });
 
   // Generate executive summary from executive brief or intermediate results

@@ -186,6 +186,7 @@
             {jobId}
             initialState={job?.state || "initialized"}
             initialProgress={job?.progress_percent || 0}
+            startedAt={job?.started_at}
             onComplete={handleComplete}
             onStateChange={handleStateChange}
             onStageComplete={handleStageComplete}

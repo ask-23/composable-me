@@ -70,7 +70,9 @@ def _run_workflow_sync(job: Job) -> None:
         job.final_documents = result.final_documents
         job.audit_report = result.audit_report
         job.executive_brief = getattr(result, "executive_brief", None)
-        job.intermediate_results = result.intermediate_results or {}
+        # Merge intermediate results to preserve any that were collected
+        if result.intermediate_results:
+            job.intermediate_results = {**job.intermediate_results, **result.intermediate_results}
         job.execution_log = result.execution_log or []
         job.error_message = result.error_message
         job.audit_failed = getattr(result, "audit_failed", False)
@@ -224,7 +226,9 @@ async def run_workflow_async(job: Job) -> None:
         job.final_documents = result.final_documents
         job.audit_report = result.audit_report
         job.executive_brief = getattr(result, "executive_brief", None)
-        job.intermediate_results = result.intermediate_results or {}
+        # Merge intermediate results - don't overwrite what was collected during polling
+        if result.intermediate_results:
+            job.intermediate_results = {**job.intermediate_results, **result.intermediate_results}
 
         # Emit stage_complete for any stages not emitted during polling loop.
         # This handles stages that completed after the final poll but before
