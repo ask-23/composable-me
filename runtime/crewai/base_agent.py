@@ -16,6 +16,8 @@ import re
 from datetime import datetime
 from crewai import Agent, Task, Crew, Process, LLM
 
+from runtime.crewai.telemetry import trace_agent_execution, record_agent_error, record_agent_result
+
 # Constants
 DEFAULT_CONFIDENCE = 0.8
 MIN_CONFIDENCE = 0.0
@@ -278,50 +280,59 @@ Return ONLY valid JSON. Do not include any text before or after the JSON object.
     ) -> Dict[str, Any]:
         """
         Execute task with retry logic.
-        
+
         Args:
             task: The task to execute
             max_retries: Maximum number of retries on failure
-            
+
         Returns:
             Validated output dictionary
-            
+
         Raises:
             ValidationError: If all retries fail
         """
         last_error = None
-        
-        for attempt in range(max_retries + 1):
-            try:
-                # Execute task via a minimal Crew (Task.execute is not available in newer CrewAI)
-                crew = Crew(
-                    agents=[task.agent],
-                    tasks=[task],
-                    process=Process.sequential,
-                    verbose=False,
-                )
-                result = crew.kickoff()
-                
-                # Validate output
-                validated = self.validate_output(str(result))
-                
-                return validated
-                
-            except (ValidationError, Exception) as e:
-                last_error = e
-                
-                if attempt < max_retries:
-                    # Log retry attempt
-                    print(f"Retry {attempt + 1}/{max_retries} for {self.role}: {e}")
-                    continue
-                else:
-                    # Max retries reached
-                    break
-        
-        # All retries failed
-        raise ValidationError(
-            f"Agent {self.role} failed after {max_retries + 1} attempts: {last_error}"
-        )
+
+        with trace_agent_execution(self.role, {"max_retries": max_retries}) as span:
+            for attempt in range(max_retries + 1):
+                try:
+                    span.set_attribute("agent.attempt", attempt + 1)
+
+                    # Execute task via a minimal Crew (Task.execute is not available in newer CrewAI)
+                    crew = Crew(
+                        agents=[task.agent],
+                        tasks=[task],
+                        process=Process.sequential,
+                        verbose=False,
+                    )
+                    result = crew.kickoff()
+
+                    # Validate output
+                    validated = self.validate_output(str(result))
+
+                    # Record success
+                    record_agent_result(span, validated, self.role)
+                    span.set_attribute("agent.retries_used", attempt)
+
+                    return validated
+
+                except (ValidationError, Exception) as e:
+                    last_error = e
+                    span.add_event(f"retry.{attempt + 1}", {"error": str(e)})
+
+                    if attempt < max_retries:
+                        # Log retry attempt
+                        print(f"Retry {attempt + 1}/{max_retries} for {self.role}: {e}")
+                        continue
+                    else:
+                        # Max retries reached - record error
+                        record_agent_error(span, e, self.role)
+                        break
+
+            # All retries failed
+            raise ValidationError(
+                f"Agent {self.role} failed after {max_retries + 1} attempts: {last_error}"
+            )
     
     @abstractmethod
     def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:

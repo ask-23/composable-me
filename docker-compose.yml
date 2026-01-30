@@ -31,6 +31,14 @@ services:
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       # Backend URL for frontend
       - BACKEND_URL=http://localhost:8000
+      # OpenTelemetry Configuration (optional)
+      - OTEL_ENABLED=${OTEL_ENABLED:-false}
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-hydra-backend}
+      - OTEL_SERVICE_VERSION=${OTEL_SERVICE_VERSION:-1.0.0}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+      - OTEL_EXPORTER_OTLP_PROTOCOL=${OTEL_EXPORTER_OTLP_PROTOCOL:-grpc}
+      - OTEL_CONSOLE_EXPORT=${OTEL_CONSOLE_EXPORT:-false}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
     volumes:
       # Persist job database
       - hydra_data:/app/web/backend/data
