@@ -80,4 +80,5 @@ playwright/.cache/
 *[CANDIDATE NAME]*
 .env
 .env.*
+!.env.example
 *.db

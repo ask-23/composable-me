@@ -28,6 +28,7 @@ from runtime.crewai.agents.auditor import AuditorSuiteAgent
 from runtime.crewai.agents.executive_synthesizer import ExecutiveSynthesizerAgent
 from runtime.crewai.base_agent import ValidationError, BaseHydraAgent
 from runtime.crewai.model_config import get_llm_for_agent, get_agent_model_info, LLMClientError
+from runtime.crewai.telemetry import trace_workflow_stage
 
 
 class WorkflowState(Enum):
@@ -360,20 +361,27 @@ class HydraWorkflow:
         """Execute gap analysis stage"""
         self.current_state = WorkflowState.GAP_ANALYSIS
         self._log("Executing Gap Analysis")
-        
-        result = self._execute_with_fallback(self.gap_analyzer, context, "gap_analysis")
-        self.intermediate_results["gap_analysis"] = result
 
-        if self.interactive:
-            print("\n📊 GAP ANALYSIS COMPLETE")
-            # Ideally print specific gaps here, but for now just pause
-            if not UserInteraction.ask_yes_no("Proceed with these findings?"):
-                self._log("User aborted after Gap Analysis")
-                raise Exception("User aborted workflow")
-        else:
-            # Web mode: Check for approval in context
-            if not context.get("gap_analysis_approved", False):
-                 raise WorkflowPaused(WorkflowState.GAP_ANALYSIS_REVIEW, "Waiting for Gap Analysis approval")
+        with trace_workflow_stage("gap_analysis") as span:
+            result = self._execute_with_fallback(self.gap_analyzer, context, "gap_analysis")
+            self.intermediate_results["gap_analysis"] = result
+
+            # Record metrics
+            gaps_count = len(result.get("gaps", []))
+            span.set_attribute("stage.gaps_found", gaps_count)
+            span.set_attribute("stage.confidence", result.get("confidence", 0))
+
+            if self.interactive:
+                print("\n📊 GAP ANALYSIS COMPLETE")
+                # Ideally print specific gaps here, but for now just pause
+                if not UserInteraction.ask_yes_no("Proceed with these findings?"):
+                    self._log("User aborted after Gap Analysis")
+                    raise Exception("User aborted workflow")
+            else:
+                # Web mode: Check for approval in context
+                if not context.get("gap_analysis_approved", False):
+                    span.set_attribute("stage.paused", True)
+                    raise WorkflowPaused(WorkflowState.GAP_ANALYSIS_REVIEW, "Waiting for Gap Analysis approval")
 
         return result
     
@@ -382,46 +390,52 @@ class HydraWorkflow:
         self.current_state = WorkflowState.INTERROGATION
         self._log("Executing Interrogation Preparation")
 
-        # Extract gaps from gap_result for interrogation context
-        # Handle both flat and nested structures
-        gaps = []
-        if "gaps" in gap_result:
-            gaps = gap_result["gaps"]
-        elif "gap_analysis" in gap_result:
-            analysis = gap_result["gap_analysis"]
-            if "gaps" in analysis:
-                gaps = analysis["gaps"]
-            # Also extract requirements classified as gaps
-            if "requirements" in analysis:
-                for req in analysis["requirements"]:
-                    if isinstance(req, dict) and req.get("classification") in ["gap", "blocker"]:
-                        gaps.append(req)
-        
-        interrogation_context = {
-            **context,
-            "gap_analysis": gap_result,
-            "gaps": gaps if gaps else []  # Provide empty list if no gaps found
-        }
-        result = self._execute_with_fallback(self.interrogator_prepper, interrogation_context, "interrogation")
-        self.intermediate_results["interrogation"] = result
-        
-        questions = result.get("questions", [])
-        if not questions:
-            self._log("No interview questions needed (no skill gaps to address)")
-            return result
+        with trace_workflow_stage("interrogation") as span:
+            # Extract gaps from gap_result for interrogation context
+            # Handle both flat and nested structures
+            gaps = []
+            if "gaps" in gap_result:
+                gaps = gap_result["gaps"]
+            elif "gap_analysis" in gap_result:
+                analysis = gap_result["gap_analysis"]
+                if "gaps" in analysis:
+                    gaps = analysis["gaps"]
+                # Also extract requirements classified as gaps
+                if "requirements" in analysis:
+                    for req in analysis["requirements"]:
+                        if isinstance(req, dict) and req.get("classification") in ["gap", "blocker"]:
+                            gaps.append(req)
 
-        if self.interactive:
-            answers = UserInteraction.conduct_interview(questions)
-            # Merge answers into result
-            result["interview_notes"] = answers
-            self._log("User completed interactive interview")
-        else:
-            # Web mode: Check for answers in context
-            if not context.get("interview_answers"):
-                 raise WorkflowPaused(WorkflowState.INTERROGATION_REVIEW, "Waiting for interview answers")
-            
-            # If answers provided, merge them
-            result["interview_notes"] = context["interview_answers"]
+            span.set_attribute("stage.input_gaps_count", len(gaps))
+
+            interrogation_context = {
+                **context,
+                "gap_analysis": gap_result,
+                "gaps": gaps if gaps else []  # Provide empty list if no gaps found
+            }
+            result = self._execute_with_fallback(self.interrogator_prepper, interrogation_context, "interrogation")
+            self.intermediate_results["interrogation"] = result
+
+            questions = result.get("questions", [])
+            span.set_attribute("stage.questions_generated", len(questions))
+
+            if not questions:
+                self._log("No interview questions needed (no skill gaps to address)")
+                return result
+
+            if self.interactive:
+                answers = UserInteraction.conduct_interview(questions)
+                # Merge answers into result
+                result["interview_notes"] = answers
+                self._log("User completed interactive interview")
+            else:
+                # Web mode: Check for answers in context
+                if not context.get("interview_answers"):
+                    span.set_attribute("stage.paused", True)
+                    raise WorkflowPaused(WorkflowState.INTERROGATION_REVIEW, "Waiting for interview answers")
+
+                # If answers provided, merge them
+                result["interview_notes"] = context["interview_answers"]
 
         return result
 
@@ -430,13 +444,20 @@ class HydraWorkflow:
         self.current_state = WorkflowState.DIFFERENTIATION
         self._log("Executing Differentiation")
 
-        differentiation_context = {
-            **context,
-            "gap_analysis": gap_result,
-            "interview_notes": interrogation_result.get("interview_notes", "")  # Provide empty string if missing
-        }
-        result = self._execute_with_fallback(self.differentiator, differentiation_context, "differentiation")
-        self.intermediate_results["differentiation"] = result
+        with trace_workflow_stage("differentiation") as span:
+            differentiation_context = {
+                **context,
+                "gap_analysis": gap_result,
+                "interview_notes": interrogation_result.get("interview_notes", "")  # Provide empty string if missing
+            }
+            result = self._execute_with_fallback(self.differentiator, differentiation_context, "differentiation")
+            self.intermediate_results["differentiation"] = result
+
+            # Record metrics
+            differentiators_count = len(result.get("differentiators", []))
+            span.set_attribute("stage.differentiators_found", differentiators_count)
+            span.set_attribute("stage.confidence", result.get("confidence", 0))
+
         return result
 
     def _execute_tailoring(self, context: Dict[str, Any], gap_result: Dict[str, Any],
@@ -444,18 +465,24 @@ class HydraWorkflow:
         """Execute tailoring stage"""
         self.current_state = WorkflowState.TAILORING
         self._log("Executing Tailoring")
-        
-        # Add all required context
-        tailoring_context = {
-            **context,
-            "gap_analysis": gap_result,
-            "interview_notes": interrogation_result.get("interview_notes", ""),
-            "interrogation_prep": interrogation_result,
-            "differentiation": differentiation_result,
-            "differentiators": differentiation_result.get("differentiators", [])
-        }
-        result = self._execute_with_fallback(self.tailoring_agent, tailoring_context, "tailoring")
-        self.intermediate_results["tailoring"] = result
+
+        with trace_workflow_stage("tailoring") as span:
+            # Add all required context
+            tailoring_context = {
+                **context,
+                "gap_analysis": gap_result,
+                "interview_notes": interrogation_result.get("interview_notes", ""),
+                "interrogation_prep": interrogation_result,
+                "differentiation": differentiation_result,
+                "differentiators": differentiation_result.get("differentiators", [])
+            }
+            result = self._execute_with_fallback(self.tailoring_agent, tailoring_context, "tailoring")
+            self.intermediate_results["tailoring"] = result
+
+            span.set_attribute("stage.confidence", result.get("confidence", 0))
+            span.set_attribute("stage.has_resume", bool(result.get("tailored_output", {}).get("resume")))
+            span.set_attribute("stage.has_cover_letter", bool(result.get("tailored_output", {}).get("cover_letter")))
+
         return result
 
     def _execute_ats_optimization(self, context: Dict[str, Any], tailoring_result: Dict[str, Any]) -> Dict[str, Any]:
@@ -463,19 +490,27 @@ class HydraWorkflow:
         self.current_state = WorkflowState.ATS_OPTIMIZATION
         self._log("Executing ATS Optimization")
 
-        # Extract tailored content from nested structure
-        tailored_output = tailoring_result.get("tailored_output", {})
-        tailored_resume = tailored_output.get("resume", {})
-        tailored_cover = tailored_output.get("cover_letter", {})
-        
-        ats_context = {
-            **context,
-            "tailored_resume": tailored_resume.get("content", "") if isinstance(tailored_resume, dict) else str(tailored_resume),
-            "tailored_cover_letter": tailored_cover.get("content", "") if isinstance(tailored_cover, dict) else str(tailored_cover),
-            "differentiators": self.intermediate_results.get("differentiation", {}).get("differentiators", [])
-        }
-        result = self._execute_with_fallback(self.ats_optimizer, ats_context, "ats_optimization")
-        self.intermediate_results["ats_optimization"] = result
+        with trace_workflow_stage("ats_optimization") as span:
+            # Extract tailored content from nested structure
+            tailored_output = tailoring_result.get("tailored_output", {})
+            tailored_resume = tailored_output.get("resume", {})
+            tailored_cover = tailored_output.get("cover_letter", {})
+
+            ats_context = {
+                **context,
+                "tailored_resume": tailored_resume.get("content", "") if isinstance(tailored_resume, dict) else str(tailored_resume),
+                "tailored_cover_letter": tailored_cover.get("content", "") if isinstance(tailored_cover, dict) else str(tailored_cover),
+                "differentiators": self.intermediate_results.get("differentiation", {}).get("differentiators", [])
+            }
+            result = self._execute_with_fallback(self.ats_optimizer, ats_context, "ats_optimization")
+            self.intermediate_results["ats_optimization"] = result
+
+            # Record ATS score if available
+            ats_report = result.get("ats_report", {})
+            if "ats_score" in ats_report:
+                span.set_attribute("stage.ats_score", ats_report["ats_score"])
+            span.set_attribute("stage.confidence", result.get("confidence", 0))
+
         return result
 
     def _execute_audit_with_retry(self, context: Dict[str, Any], ats_result: Dict[str, Any]) -> Dict[str, Any]:
@@ -489,145 +524,157 @@ class HydraWorkflow:
         self.current_state = WorkflowState.AUDITING
         self._log("Executing Audit with Retry Logic")
 
-        retry_count = 0
-        
-        # Extract documents from nested ATS result structure
-        ats_report = ats_result.get("ats_report", {})
-        current_documents = {
-            "resume": ats_report.get("optimized_resume", ""),
-            "cover_letter": ats_report.get("optimized_cover_letter", "")
-        }
-        
-        # Fallback: if ATS didn't provide optimized version, use tailored from intermediate results
-        if not current_documents["resume"]:
-            tailoring = self.intermediate_results.get("tailoring", {})
-            tailored_output = tailoring.get("tailored_output", {})
-            resume_data = tailored_output.get("resume", {})
-            current_documents["resume"] = resume_data.get("content", "") if isinstance(resume_data, dict) else str(resume_data)
-        
-        if not current_documents["cover_letter"]:
-            tailoring = self.intermediate_results.get("tailoring", {})
-            tailored_output = tailoring.get("tailored_output", {})
-            cover_data = tailored_output.get("cover_letter", {})
-            current_documents["cover_letter"] = cover_data.get("content", "") if isinstance(cover_data, dict) else str(cover_data)
+        with trace_workflow_stage("auditing", {"max_retries": self.max_audit_retries}) as span:
+            retry_count = 0
 
-        last_error = None
-        last_resume_audit = None
-        last_cover_letter_audit = None
+            # Extract documents from nested ATS result structure
+            ats_report = ats_result.get("ats_report", {})
+            current_documents = {
+                "resume": ats_report.get("optimized_resume", ""),
+                "cover_letter": ats_report.get("optimized_cover_letter", "")
+            }
 
-        while retry_count <= self.max_audit_retries:
-            try:
-                # Audit the resume
-                resume_audit_context = {
-                    **context,
-                    "document": current_documents["resume"],
-                    "document_type": "resume"
-                }
-                resume_audit = self._execute_with_fallback(self.auditor_suite, resume_audit_context, "auditor_suite")
-                last_resume_audit = resume_audit
+            # Fallback: if ATS didn't provide optimized version, use tailored from intermediate results
+            if not current_documents["resume"]:
+                tailoring = self.intermediate_results.get("tailoring", {})
+                tailored_output = tailoring.get("tailored_output", {})
+                resume_data = tailored_output.get("resume", {})
+                current_documents["resume"] = resume_data.get("content", "") if isinstance(resume_data, dict) else str(resume_data)
 
-                # Audit the cover letter if present
-                cover_letter_audit = None
-                if current_documents["cover_letter"]:
-                    cover_letter_audit_context = {
+            if not current_documents["cover_letter"]:
+                tailoring = self.intermediate_results.get("tailoring", {})
+                tailored_output = tailoring.get("tailored_output", {})
+                cover_data = tailored_output.get("cover_letter", {})
+                current_documents["cover_letter"] = cover_data.get("content", "") if isinstance(cover_data, dict) else str(cover_data)
+
+            last_error = None
+            last_resume_audit = None
+            last_cover_letter_audit = None
+
+            while retry_count <= self.max_audit_retries:
+                try:
+                    span.set_attribute("stage.attempt", retry_count + 1)
+
+                    # Audit the resume
+                    resume_audit_context = {
                         **context,
-                        "document": current_documents["cover_letter"],
-                        "document_type": "cover_letter"
+                        "document": current_documents["resume"],
+                        "document_type": "resume"
                     }
-                    cover_letter_audit = self._execute_with_fallback(self.auditor_suite, cover_letter_audit_context, "auditor_suite")
-                    last_cover_letter_audit = cover_letter_audit
+                    resume_audit = self._execute_with_fallback(self.auditor_suite, resume_audit_context, "auditor_suite")
+                    last_resume_audit = resume_audit
 
-                # Check if audit passed - handle both nested and flat structures
-                # Try nested first (audit_report.approval.approved)
-                resume_approved = False
-                if "audit_report" in resume_audit:
-                    resume_approved = resume_audit["audit_report"].get("approval", {}).get("approved", False)
-                else:
-                    # Try flat structure (approval.approved)
-                    resume_approved = resume_audit.get("approval", {}).get("approved", False)
+                    # Audit the cover letter if present
+                    cover_letter_audit = None
+                    if current_documents["cover_letter"]:
+                        cover_letter_audit_context = {
+                            **context,
+                            "document": current_documents["cover_letter"],
+                            "document_type": "cover_letter"
+                        }
+                        cover_letter_audit = self._execute_with_fallback(self.auditor_suite, cover_letter_audit_context, "auditor_suite")
+                        last_cover_letter_audit = cover_letter_audit
 
-                cover_letter_approved = True  # Default to true if no cover letter
-                if cover_letter_audit:
-                    if "audit_report" in cover_letter_audit:
-                        cover_letter_approved = cover_letter_audit["audit_report"].get("approval", {}).get("approved", False)
+                    # Check if audit passed - handle both nested and flat structures
+                    # Try nested first (audit_report.approval.approved)
+                    resume_approved = False
+                    if "audit_report" in resume_audit:
+                        resume_approved = resume_audit["audit_report"].get("approval", {}).get("approved", False)
                     else:
-                        cover_letter_approved = cover_letter_audit.get("approval", {}).get("approved", False)
+                        # Try flat structure (approval.approved)
+                        resume_approved = resume_audit.get("approval", {}).get("approved", False)
 
-                if resume_approved and cover_letter_approved:
-                    self._log(f"Audit passed on attempt {retry_count + 1}")
-                    return {
-                        "final_documents": current_documents,
-                        "audit_report": {
-                            "resume_audit": resume_audit,
-                            "cover_letter_audit": cover_letter_audit,
-                            "final_status": "APPROVED",
-                            "retry_count": retry_count
-                        },
-                        "audit_failed": False,
-                        "audit_error": None
-                    }
+                    cover_letter_approved = True  # Default to true if no cover letter
+                    if cover_letter_audit:
+                        if "audit_report" in cover_letter_audit:
+                            cover_letter_approved = cover_letter_audit["audit_report"].get("approval", {}).get("approved", False)
+                        else:
+                            cover_letter_approved = cover_letter_audit.get("approval", {}).get("approved", False)
 
-                # If audit found issues and we have retries left
-                if retry_count < self.max_audit_retries:
-                    retry_count += 1
-                    self._log(f"Audit found issues - applying fixes (attempt {retry_count}/{self.max_audit_retries})")
+                    if resume_approved and cover_letter_approved:
+                        self._log(f"Audit passed on attempt {retry_count + 1}")
+                        span.set_attribute("stage.final_status", "APPROVED")
+                        span.set_attribute("stage.retry_count", retry_count)
+                        return {
+                            "final_documents": current_documents,
+                            "audit_report": {
+                                "resume_audit": resume_audit,
+                                "cover_letter_audit": cover_letter_audit,
+                                "final_status": "APPROVED",
+                                "retry_count": retry_count
+                            },
+                            "audit_failed": False,
+                            "audit_error": None
+                        }
 
-                    # Apply fixes from audit recommendations
-                    current_documents = self._apply_audit_fixes(current_documents, resume_audit, cover_letter_audit)
-                else:
-                    # Max retries reached - return with REJECTED status instead of crashing
-                    self._log("Documents complete but some audit concerns remain (see audit report for details)")
-                    return {
-                        "final_documents": current_documents,
-                        "audit_report": {
-                            "resume_audit": resume_audit,
-                            "cover_letter_audit": cover_letter_audit,
-                            "final_status": "REJECTED",
-                            "retry_count": retry_count,
-                            "rejection_reason": "Document failed audit after maximum retries"
-                        },
-                        "audit_failed": True,
-                        "audit_error": "Document failed audit after maximum retries"
-                    }
+                    # If audit found issues and we have retries left
+                    if retry_count < self.max_audit_retries:
+                        retry_count += 1
+                        self._log(f"Audit found issues - applying fixes (attempt {retry_count}/{self.max_audit_retries})")
+                        span.add_event(f"audit.retry.{retry_count}")
 
-            except Exception as e:
-                last_error = str(e)
-                if retry_count < self.max_audit_retries:
-                    retry_count += 1
-                    self._log(f"Audit error: {str(e)}, attempting retry {retry_count}/{self.max_audit_retries}")
-                else:
-                    # STABILITY FIX: Instead of crashing, return documents with AUDIT_CRASHED status
-                    self._log(f"Audit crashed after {retry_count + 1} attempts: {str(e)}")
-                    return {
-                        "final_documents": current_documents,
-                        "audit_report": {
-                            "resume_audit": last_resume_audit,
-                            "cover_letter_audit": last_cover_letter_audit,
-                            "final_status": "AUDIT_CRASHED",
-                            "retry_count": retry_count,
-                            "crash_error": str(e)
-                        },
-                        "audit_failed": True,
-                        "audit_error": f"Audit crashed: {str(e)}"
-                    }
+                        # Apply fixes from audit recommendations
+                        current_documents = self._apply_audit_fixes(current_documents, resume_audit, cover_letter_audit)
+                    else:
+                        # Max retries reached - return with REJECTED status instead of crashing
+                        self._log("Documents complete but some audit concerns remain (see audit report for details)")
+                        span.set_attribute("stage.final_status", "REJECTED")
+                        span.set_attribute("stage.retry_count", retry_count)
+                        return {
+                            "final_documents": current_documents,
+                            "audit_report": {
+                                "resume_audit": resume_audit,
+                                "cover_letter_audit": cover_letter_audit,
+                                "final_status": "REJECTED",
+                                "retry_count": retry_count,
+                                "rejection_reason": "Document failed audit after maximum retries"
+                            },
+                            "audit_failed": True,
+                            "audit_error": "Document failed audit after maximum retries"
+                        }
 
-        # Safety fallback - should not reach here, but return gracefully instead of crashing
-        self._log("Audit retry loop exceeded, returning documents with AUDIT_CRASHED status")
-        return {
-            "final_documents": current_documents,
-            "audit_report": {
-                "resume_audit": last_resume_audit,
-                "cover_letter_audit": last_cover_letter_audit,
-                "final_status": "AUDIT_CRASHED",
-                "retry_count": retry_count,
-                "crash_error": last_error or "Unknown error in audit retry loop"
-            },
-            "audit_failed": True,
-            "audit_error": last_error or "Unknown error in audit retry loop"
-        }
+                except Exception as e:
+                    last_error = str(e)
+                    if retry_count < self.max_audit_retries:
+                        retry_count += 1
+                        self._log(f"Audit error: {str(e)}, attempting retry {retry_count}/{self.max_audit_retries}")
+                        span.add_event(f"audit.error.{retry_count}", {"error": str(e)})
+                    else:
+                        # STABILITY FIX: Instead of crashing, return documents with AUDIT_CRASHED status
+                        self._log(f"Audit crashed after {retry_count + 1} attempts: {str(e)}")
+                        span.set_attribute("stage.final_status", "AUDIT_CRASHED")
+                        span.set_attribute("stage.error", str(e))
+                        return {
+                            "final_documents": current_documents,
+                            "audit_report": {
+                                "resume_audit": last_resume_audit,
+                                "cover_letter_audit": last_cover_letter_audit,
+                                "final_status": "AUDIT_CRASHED",
+                                "retry_count": retry_count,
+                                "crash_error": str(e)
+                            },
+                            "audit_failed": True,
+                            "audit_error": f"Audit crashed: {str(e)}"
+                        }
+
+            # Safety fallback - should not reach here, but return gracefully instead of crashing
+            self._log("Audit retry loop exceeded, returning documents with AUDIT_CRASHED status")
+            span.set_attribute("stage.final_status", "AUDIT_CRASHED")
+            return {
+                "final_documents": current_documents,
+                "audit_report": {
+                    "resume_audit": last_resume_audit,
+                    "cover_letter_audit": last_cover_letter_audit,
+                    "final_status": "AUDIT_CRASHED",
+                    "retry_count": retry_count,
+                    "crash_error": last_error or "Unknown error in audit retry loop"
+                },
+                "audit_failed": True,
+                "audit_error": last_error or "Unknown error in audit retry loop"
+            }
 
     def _execute_executive_synthesis(
-        self, 
+        self,
         context: Dict[str, Any],
         gap_result: Dict[str, Any],
         interrogation_result: Dict[str, Any],
@@ -639,46 +686,56 @@ class HydraWorkflow:
         """Execute executive synthesis to create strategic brief"""
         self.current_state = WorkflowState.EXECUTIVE_SYNTHESIS
         self._log("Executing Executive Synthesis")
-        
-        try:
-            synthesis_context = {
-                "job_description": context.get("job_description", ""),
-                "resume": context.get("resume", ""),
-                "gap_analysis": gap_result,
-                "interview_notes": interrogation_result,
-                "differentiation": differentiation_result,
-                "tailored_resume": tailoring_result.get("tailored_resume", ""),
-                "tailored_cover_letter": tailoring_result.get("tailored_cover_letter", ""),
-                "ats_optimization": ats_result,
-                "audit_report": audit_result.get("audit_report", {}),
-            }
-            
-            result = self._execute_with_fallback(self.executive_synthesizer, synthesis_context, "executive_synthesis")
-            self.intermediate_results["executive_synthesis"] = result
-            self._log(f"Executive synthesis complete: {result.get('decision', {}).get('recommendation', 'UNKNOWN')}")
-            return result
-            
-        except Exception as e:
-            self._log(f"Executive synthesis failed: {str(e)}")
-            # Return a minimal brief on failure with user-friendly message
-            # Don't expose internal schema validation errors to the user
-            user_message = "Executive summary could not be generated. Your documents are still ready for review."
-            return {
-                "decision": {
-                    "recommendation": "PROCEED",
-                    "fit_score": 70,  # Default to reasonable score, not 0
-                    "rationale": user_message,
-                    "deal_makers": ["Your tailored documents have been generated successfully"],
-                    "deal_breakers": []
-                },
-                "action_items": {
-                    "immediate": [
-                        "Review your tailored resume and cover letter",
-                        "Make any personal adjustments before submitting"
-                    ]
-                },
-                "synthesis_error": str(e)  # Keep technical error for debug tab
-            }
+
+        with trace_workflow_stage("executive_synthesis") as span:
+            try:
+                synthesis_context = {
+                    "job_description": context.get("job_description", ""),
+                    "resume": context.get("resume", ""),
+                    "gap_analysis": gap_result,
+                    "interview_notes": interrogation_result,
+                    "differentiation": differentiation_result,
+                    "tailored_resume": tailoring_result.get("tailored_resume", ""),
+                    "tailored_cover_letter": tailoring_result.get("tailored_cover_letter", ""),
+                    "ats_optimization": ats_result,
+                    "audit_report": audit_result.get("audit_report", {}),
+                }
+
+                result = self._execute_with_fallback(self.executive_synthesizer, synthesis_context, "executive_synthesis")
+                self.intermediate_results["executive_synthesis"] = result
+
+                # Record metrics
+                decision = result.get("decision", {})
+                span.set_attribute("stage.recommendation", decision.get("recommendation", "UNKNOWN"))
+                span.set_attribute("stage.fit_score", decision.get("fit_score", 0))
+
+                self._log(f"Executive synthesis complete: {decision.get('recommendation', 'UNKNOWN')}")
+                return result
+
+            except Exception as e:
+                self._log(f"Executive synthesis failed: {str(e)}")
+                span.set_attribute("stage.error", str(e))
+                span.set_attribute("stage.fallback_used", True)
+
+                # Return a minimal brief on failure with user-friendly message
+                # Don't expose internal schema validation errors to the user
+                user_message = "Executive summary could not be generated. Your documents are still ready for review."
+                return {
+                    "decision": {
+                        "recommendation": "PROCEED",
+                        "fit_score": 70,  # Default to reasonable score, not 0
+                        "rationale": user_message,
+                        "deal_makers": ["Your tailored documents have been generated successfully"],
+                        "deal_breakers": []
+                    },
+                    "action_items": {
+                        "immediate": [
+                            "Review your tailored resume and cover letter",
+                            "Make any personal adjustments before submitting"
+                        ]
+                    },
+                    "synthesis_error": str(e)  # Keep technical error for debug tab
+                }
 
     def _apply_audit_fixes(self, documents: Dict[str, str], resume_audit: Dict[str, Any],
                           cover_letter_audit: Optional[Dict[str, Any]]) -> Dict[str, str]:
