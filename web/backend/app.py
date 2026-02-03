@@ -8,14 +8,18 @@ from pathlib import Path
 # This ensures API keys are available when workflow_runner imports llm_client
 from dotenv import load_dotenv
 
-# Find .env file in project root (parent of web/backend)
+# Find .env/a.env files in project root (parent of web/backend)
 project_root = Path(__file__).parent.parent.parent
-env_file = project_root / ".env"
-if env_file.exists():
-    load_dotenv(env_file)
-    logging.info(f"Loaded environment from {env_file}")
+env_files = [project_root / "a.env", project_root / ".env"]
+loaded_env_files = []
+for env_file in env_files:
+    if env_file.exists():
+        load_dotenv(env_file)
+        loaded_env_files.append(str(env_file))
+if loaded_env_files:
+    logging.info(f"Loaded environment from {', '.join(loaded_env_files)}")
 else:
-    logging.warning(f"No .env file found at {env_file}")
+    logging.warning(f"No .env or a.env file found at {project_root}")
 
 from litestar import Litestar
 from litestar.config.cors import CORSConfig
