@@ -82,3 +82,4 @@ playwright/.cache/
 .env.*
 !.env.example
 *.db
+.worktrees/

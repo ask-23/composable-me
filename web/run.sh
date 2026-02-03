@@ -10,12 +10,22 @@ run_backend() {
     BACKEND_PORT="${HYDRA_BACKEND_PORT:-8000}"
     echo "Starting Litestar backend on http://localhost:${BACKEND_PORT}..."
     source .venv/bin/activate 2>/dev/null || true
-    # Source .env file if it exists to load API keys
+    # Source .env/a.env files if they exist to load API keys
+    ENV_FILES=()
     if [ -f .env ]; then
+        ENV_FILES+=(".env")
+    fi
+    if [ -f a.env ]; then
+        ENV_FILES+=("a.env")
+    fi
+    if [ ${#ENV_FILES[@]} -gt 0 ]; then
         set -a
-        source .env
+        for ENV_FILE in "${ENV_FILES[@]}"; do
+            # shellcheck disable=SC1090
+            source "$ENV_FILE"
+        done
         set +a
-        echo "Loaded environment from .env"
+        echo "Loaded environment from ${ENV_FILES[*]}"
     fi
     # Default DB path to a temp location to avoid persisting real inputs into the repo.
     export HYDRA_DB_PATH="${HYDRA_DB_PATH:-/tmp/hydra-jobs.db}"
