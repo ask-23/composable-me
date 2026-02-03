@@ -8,6 +8,7 @@ import logging
 
 from web.backend.services.job_queue import Job, job_queue
 from web.backend.models import JobState
+from web.backend.telemetry import get_tracer, create_span, record_exception
 
 # Import from parent project
 from runtime.crewai.hydra_workflow import HydraWorkflow, WorkflowState
@@ -150,130 +151,150 @@ async def run_workflow_async(job: Job) -> None:
 
     loop = asyncio.get_event_loop()
 
-    try:
-        # Initialize LLM client
-        llm = get_llm_client(model=job.model)
-        
-        # Create workflow
-        workflow = HydraWorkflow(llm, max_audit_retries=job.max_audit_retries)
-        
-        # Store agent_models immediately so it's available
-        job.agent_models = workflow.agent_models
+    # Create tracing span for the entire workflow execution
+    with create_span("workflow.execute", {
+        "job.id": job.id,
+        "job.model": job.model or "default",
+        "job.max_audit_retries": job.max_audit_retries,
+    }) as workflow_span:
+        try:
+            # Initialize LLM client
+            with create_span("workflow.init_llm") as llm_span:
+                llm = get_llm_client(model=job.model)
+                llm_span.set_attribute("llm.model", job.model or "default")
 
-        # Build context (include previous results for resuming)
-        context = {
-            "job_description": job.job_description,
-            "resume": job.resume,
-            "source_documents": job.source_documents,
-            "previous_results": job.intermediate_results,
-            "gap_analysis_approved": job.gap_analysis_approved,
-            "interview_answers": job.interview_answers,
-        }
+            # Create workflow
+            with create_span("workflow.init") as init_span:
+                workflow = HydraWorkflow(llm, max_audit_retries=job.max_audit_retries)
+                init_span.set_attribute("workflow.agent_count", len(workflow.agent_models))
 
-        # Create a future for the workflow execution
-        def run_workflow():
-            return workflow.execute(context)
+            # Store agent_models immediately so it's available
+            job.agent_models = workflow.agent_models
+            workflow_span.set_attribute("workflow.agents", str(list(workflow.agent_models.keys())))
 
-        future = loop.run_in_executor(_executor, run_workflow)
+            # Build context (include previous results for resuming)
+            context = {
+                "job_description": job.job_description,
+                "resume": job.resume,
+                "source_documents": job.source_documents,
+                "previous_results": job.intermediate_results,
+                "gap_analysis_approved": job.gap_analysis_approved,
+                "interview_answers": job.interview_answers,
+            }
 
-        # Poll for state changes while workflow runs
-        last_state = None
-        last_log_length = 0
-        emitted_stages: set[str] = set()  # Track stages already emitted via SSE
+            # Create a future for the workflow execution
+            def run_workflow():
+                return workflow.execute(context)
 
-        while not future.done():
-            await asyncio.sleep(0.5)  # Poll twice per second for responsiveness
-            
-            # Get current state from workflow
-            current_state = _map_workflow_state(workflow.get_current_state())
-            
-            # Emit state change event
-            if current_state != last_state:
-                last_state = current_state
-                job.state = current_state
-                await job.emit_event("progress", {
-                    "state": current_state.value,
-                    "progress": job.get_progress_percent(),
-                    "agent_models": job.agent_models,
-                })
+            future = loop.run_in_executor(_executor, run_workflow)
 
-            # Emit new log entries
-            current_log = workflow.get_execution_log()
-            if len(current_log) > last_log_length:
-                new_entries = current_log[last_log_length:]
-                last_log_length = len(current_log)
-                job.execution_log = current_log
-                for entry in new_entries:
-                    await job.emit_event("log", {"message": entry})
+            # Poll for state changes while workflow runs
+            last_state = None
+            last_log_length = 0
+            emitted_stages: set[str] = set()  # Track stages already emitted via SSE
 
-            # Emit intermediate results
-            intermediate = workflow.get_intermediate_results()
-            for stage, stage_result in intermediate.items():
+            while not future.done():
+                await asyncio.sleep(0.5)  # Poll twice per second for responsiveness
+
+                # Get current state from workflow
+                current_state = _map_workflow_state(workflow.get_current_state())
+
+                # Emit state change event
+                if current_state != last_state:
+                    last_state = current_state
+                    job.state = current_state
+                    workflow_span.add_event(f"state.{current_state.value}")
+                    await job.emit_event("progress", {
+                        "state": current_state.value,
+                        "progress": job.get_progress_percent(),
+                        "agent_models": job.agent_models,
+                    })
+
+                # Emit new log entries
+                current_log = workflow.get_execution_log()
+                if len(current_log) > last_log_length:
+                    new_entries = current_log[last_log_length:]
+                    last_log_length = len(current_log)
+                    job.execution_log = current_log
+                    for entry in new_entries:
+                        await job.emit_event("log", {"message": entry})
+
+                # Emit intermediate results
+                intermediate = workflow.get_intermediate_results()
+                for stage, stage_result in intermediate.items():
+                    if stage not in emitted_stages:
+                        emitted_stages.add(stage)
+                        job.intermediate_results[stage] = stage_result
+                        workflow_span.add_event(f"stage.{stage}.complete")
+                        await job.emit_event("stage_complete", {
+                            "stage": stage,
+                            "result": stage_result,
+                        })
+
+            # Get the result from the future
+            result = future.result()
+
+            # Update job with results
+            job.state = _map_workflow_state(result.state)
+            job.success = result.success
+            job.final_documents = result.final_documents
+            job.audit_report = result.audit_report
+            job.executive_brief = getattr(result, "executive_brief", None)
+            # Merge intermediate results - don't overwrite what was collected during polling
+            if result.intermediate_results:
+                job.intermediate_results = {**job.intermediate_results, **result.intermediate_results}
+
+            # Emit stage_complete for any stages not emitted during polling loop.
+            # This handles stages that completed after the final poll but before
+            # future.done() returned True (race condition fix).
+            for stage, stage_result in job.intermediate_results.items():
                 if stage not in emitted_stages:
-                    emitted_stages.add(stage)
-                    job.intermediate_results[stage] = stage_result
                     await job.emit_event("stage_complete", {
                         "stage": stage,
                         "result": stage_result,
                     })
 
-        # Get the result from the future
-        result = future.result()
+            job.execution_log = result.execution_log or []
+            job.error_message = result.error_message
+            job.audit_failed = getattr(result, "audit_failed", False)
+            job.audit_error = getattr(result, "audit_error", None)
+            job.agent_models = result.agent_models or {}
 
-        # Update job with results
-        job.state = _map_workflow_state(result.state)
-        job.success = result.success
-        job.final_documents = result.final_documents
-        job.audit_report = result.audit_report
-        job.executive_brief = getattr(result, "executive_brief", None)
-        # Merge intermediate results - don't overwrite what was collected during polling
-        if result.intermediate_results:
-            job.intermediate_results = {**job.intermediate_results, **result.intermediate_results}
+            # Set final span attributes
+            workflow_span.set_attribute("workflow.success", job.success)
+            workflow_span.set_attribute("workflow.final_state", job.state.value)
+            workflow_span.set_attribute("workflow.audit_failed", job.audit_failed)
 
-        # Emit stage_complete for any stages not emitted during polling loop.
-        # This handles stages that completed after the final poll but before
-        # future.done() returned True (race condition fix).
-        for stage, stage_result in job.intermediate_results.items():
-            if stage not in emitted_stages:
-                await job.emit_event("stage_complete", {
-                    "stage": stage,
-                    "result": stage_result,
-                })
+            logger.info(f"Job {job.id} completed: success={job.success}, state={job.state}")
 
-        job.execution_log = result.execution_log or []
-        job.error_message = result.error_message
-        job.audit_failed = getattr(result, "audit_failed", False)
-        job.audit_error = getattr(result, "audit_error", None)
-        job.agent_models = result.agent_models or {}
+            # Always emit a final progress update so clients see the final state,
+            # even if the workflow finished between polling intervals.
+            await job.emit_event("progress", {
+                "state": job.state.value,
+                "progress": job.get_progress_percent(),
+                "agent_models": job.agent_models,
+            })
 
-        logger.info(f"Job {job.id} completed: success={job.success}, state={job.state}")
+            # Pause states are not terminal: keep SSE stream alive and do not mark completed.
+            if job.state in (JobState.GAP_ANALYSIS_REVIEW, JobState.INTERROGATION_REVIEW):
+                workflow_span.set_attribute("workflow.paused", True)
+                return
 
-        # Always emit a final progress update so clients see the final state,
-        # even if the workflow finished between polling intervals.
-        await job.emit_event("progress", {
-            "state": job.state.value,
-            "progress": job.get_progress_percent(),
-            "agent_models": job.agent_models,
-        })
+            # Terminal-ish: mark completion and emit completion event.
+            job.completed_at = datetime.now()
+            await job.emit_event("complete", job.get_complete_event_payload())
 
-        # Pause states are not terminal: keep SSE stream alive and do not mark completed.
-        if job.state in (JobState.GAP_ANALYSIS_REVIEW, JobState.INTERROGATION_REVIEW):
-            return
+        except Exception as e:
+            logger.error(f"Async workflow failed for job {job.id}: {e}")
+            record_exception(workflow_span, e, {"job.id": job.id})
+            job.state = JobState.FAILED
+            job.error_message = str(e)
+            job.completed_at = datetime.now()
 
-        # Terminal-ish: mark completion and emit completion event.
-        job.completed_at = datetime.now()
-        await job.emit_event("complete", job.get_complete_event_payload())
-
-    except Exception as e:
-        logger.error(f"Async workflow failed for job {job.id}: {e}")
-        job.state = JobState.FAILED
-        job.error_message = str(e)
-        job.completed_at = datetime.now()
-
-        await job.emit_event("error", {
-            "job_id": job.id,
-            "error": str(e),
-        })
+            await job.emit_event("error", {
+                "job_id": job.id,
+                "error": str(e),
+            })
 
 
 def start_workflow_background(job: Job) -> None:

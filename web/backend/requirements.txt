@@ -6,5 +6,12 @@ python-multipart>=0.0.9
 sse-starlette>=2.0.0
 python-dotenv>=1.0.0
 
+# OpenTelemetry - Observability
+opentelemetry-api>=1.20.0
+opentelemetry-sdk>=1.20.0
+opentelemetry-exporter-otlp>=1.20.0
+opentelemetry-instrumentation>=0.41b0
+opentelemetry-instrumentation-asgi>=0.41b0
+
 # Reference parent package for HydraWorkflow
 # Run with: PYTHONPATH=/Users/admin/git/composable-crew python -m uvicorn app:app
