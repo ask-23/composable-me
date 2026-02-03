@@ -10,8 +10,20 @@ if [ -d ".venv" ]; then
 fi
 
 # Source environment variables (API keys)
+ENV_FILES=()
 if [ -f ".env" ]; then
-    source .env
+    ENV_FILES+=(".env")
+fi
+if [ -f "a.env" ]; then
+    ENV_FILES+=("a.env")
+fi
+if [ ${#ENV_FILES[@]} -gt 0 ]; then
+    set -a
+    for ENV_FILE in "${ENV_FILES[@]}"; do
+        # shellcheck disable=SC1090
+        source "$ENV_FILE"
+    done
+    set +a
 fi
 
 # Set PYTHONPATH to include project root

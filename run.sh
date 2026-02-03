@@ -19,6 +19,23 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Load environment variables from .env or a.env if present
+ENV_FILES=()
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    ENV_FILES+=("$SCRIPT_DIR/.env")
+fi
+if [ -f "$SCRIPT_DIR/a.env" ]; then
+    ENV_FILES+=("$SCRIPT_DIR/a.env")
+fi
+if [ ${#ENV_FILES[@]} -gt 0 ]; then
+    set -a
+    for ENV_FILE in "${ENV_FILES[@]}"; do
+        # shellcheck disable=SC1090
+        source "$ENV_FILE"
+    done
+    set +a
+fi
+
 # Choose provider + model based on available keys (matches runtime/crewai/llm_client.py)
 if [ -n "$TOGETHER_API_KEY" ]; then
     PROVIDER="Together AI"

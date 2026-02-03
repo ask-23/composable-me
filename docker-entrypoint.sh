@@ -8,6 +8,24 @@ set -e
 
 echo "🐉 Starting Hydra Multi-Agent Application..."
 
+# Load environment variables from /app/.env or /app/a.env if present
+ENV_FILES=()
+if [ -f "/app/.env" ]; then
+    ENV_FILES+=("/app/.env")
+fi
+if [ -f "/app/a.env" ]; then
+    ENV_FILES+=("/app/a.env")
+fi
+if [ ${#ENV_FILES[@]} -gt 0 ]; then
+    set -a
+    for ENV_FILE in "${ENV_FILES[@]}"; do
+        # shellcheck disable=SC1090
+        source "$ENV_FILE"
+    done
+    set +a
+    echo "Loaded environment from ${ENV_FILES[*]}"
+fi
+
 # Start the Python backend in the background
 echo "Starting backend on http://0.0.0.0:8000..."
 cd /app
