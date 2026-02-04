@@ -26,11 +26,14 @@ if [ ${#ENV_FILES[@]} -gt 0 ]; then
     set +a
 fi
 
+# Default Postgres connection for Hydra persistence.
+export HYDRA_DATABASE_URL="${HYDRA_DATABASE_URL:-postgresql://hydra:hydra@localhost:5432/hydra}"
+
 # Set PYTHONPATH to include project root
 export PYTHONPATH="${PWD}:${PYTHONPATH}"
 
 # Install backend dependencies if needed
-pip install -q litestar uvicorn pydantic python-multipart sse-starlette python-dotenv 2>/dev/null
+pip install -q litestar uvicorn pydantic python-multipart sse-starlette python-dotenv "psycopg[binary]" 2>/dev/null
 
 # Run the server
 echo "Starting Hydra API server on http://localhost:8000"

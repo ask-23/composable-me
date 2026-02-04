@@ -34,6 +34,10 @@ class CreateJobRequest(BaseModel):
     job_description: str = Field(..., min_length=10, description="Job description text")
     resume: str = Field(..., min_length=10, description="Resume text")
     source_documents: str = Field(default="", description="Supporting documents")
+    company: Optional[str] = Field(default=None, description="Company name (optional)")
+    role_title: Optional[str] = Field(default=None, description="Role title (optional)")
+    source: Optional[str] = Field(default=None, description="Job source (optional)")
+    url: Optional[str] = Field(default=None, description="Job URL (optional)")
     model: Optional[str] = Field(default=None, description="LLM model override")
     max_audit_retries: int = Field(default=2, ge=0, le=5, description="Max audit retries")
 

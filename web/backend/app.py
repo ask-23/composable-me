@@ -31,6 +31,7 @@ from litestar.types import ASGIApp, Receive, Scope, Send
 from web.backend.routes.health import HealthController
 from web.backend.routes.jobs import JobsController
 from web.backend.telemetry import init_telemetry, shutdown_telemetry, get_tracer, create_span
+from web.backend.db import apply_migrations
 
 # Configure logging
 logging_config = LoggingConfig(
@@ -93,8 +94,13 @@ class TelemetryMiddleware(MiddlewareProtocol):
 
 
 async def on_startup() -> None:
-    """Initialize telemetry on application startup."""
+    """Initialize telemetry and database on application startup."""
     init_telemetry()
+    # Apply database migrations
+    try:
+        apply_migrations()
+    except Exception as exc:
+        logging.error("Database migrations failed: %s", exc)
 
 
 async def on_shutdown() -> None:

@@ -1,27 +1,11 @@
-import os
-import importlib.util
-from pathlib import Path
+import importlib
 
 
-def test_job_queue_db_path_can_be_overridden_by_env(tmp_path, monkeypatch):
-    """
-    Regression: allow overriding the SQLite DB path so real-input runs don't
-    persist sensitive data into the repo by default.
+def test_database_url_can_be_overridden_by_env(monkeypatch):
+    """Database URL should be configurable via environment."""
+    monkeypatch.setenv("HYDRA_DATABASE_URL", "postgresql://override:override@localhost:5432/override")
+    import web.backend.db.connection as connection
 
-    This test loads a fresh copy of the module under a temporary name so it
-    doesn't interfere with the already-imported job_queue module used elsewhere.
-    """
+    importlib.reload(connection)
 
-    db_path = tmp_path / "hydra-jobs.db"
-    monkeypatch.setenv("HYDRA_DB_PATH", str(db_path))
-
-    module_path = Path(__file__).resolve().parents[3] / "web" / "backend" / "services" / "job_queue.py"
-    spec = importlib.util.spec_from_file_location("job_queue_env_test", module_path)
-    assert spec and spec.loader
-
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)  # type: ignore[union-attr]
-
-    assert Path(module.DB_PATH) == db_path
-    assert db_path.exists()
-
+    assert connection.DATABASE_URL == "postgresql://override:override@localhost:5432/override"
