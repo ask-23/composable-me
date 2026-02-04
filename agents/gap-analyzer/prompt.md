@@ -224,7 +224,7 @@ Return ONLY valid JSON matching this structure:
       {
         "signal": "Fast-paced startup",
         "interpretation": "May mean under-resourced, context-switching",
-        "fit": "Compatible with startup experience at [Previous Company B], Agora"
+        "fit": "Compatible with startup experience at [Previous Company A], [Previous Company B]"
       },
       {
         "signal": "Autonomous team",

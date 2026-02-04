@@ -62,7 +62,7 @@ class TestTailoringAgent:
             "tailored_resume": {
                 "format": "markdown",
                 "content": """# John Doe
-Seattle, WA | user@example.com | 555-555-5555 | linkedin.com/in/johndoe
+Anytown, ST | user@example.com | 555-555-5555 | linkedin.com/in/johndoe
 
 ## Summary
 Platform Engineer who builds systems that eliminate bottlenecks. 5+ years AWS experience with focus on developer velocity and infrastructure automation.
@@ -70,7 +70,7 @@ Platform Engineer who builds systems that eliminate bottlenecks. 5+ years AWS ex
 ## Experience
 
 ### Senior Platform Engineer | Company A
-2020 – Present | Seattle, WA
+2020 – Present | Anytown, ST
 
 - Built CI/CD pipeline reducing deploy time from 45min to 8min
 - Architected multi-account AWS infrastructure serving 40+ developers

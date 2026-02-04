@@ -50,7 +50,7 @@ class TestJobsCRUD:
             source="linkedin",
             company="Acme Corp",
             role_title="Software Engineer",
-            location="San Francisco, CA",
+            location="Anytown, ST",
             remote_policy="hybrid",
         )
 
