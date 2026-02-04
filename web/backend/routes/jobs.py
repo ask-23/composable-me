@@ -60,6 +60,10 @@ class JobsController(Controller):
             job_description=data.job_description,
             resume=data.resume,
             source_documents=data.source_documents,
+            company=data.company,
+            role_title=data.role_title,
+            source=data.source,
+            url=data.url,
             model=data.model,
             max_audit_retries=data.max_audit_retries,
         )

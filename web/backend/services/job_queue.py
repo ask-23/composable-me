@@ -1,65 +1,26 @@
-"""SQLite-backed job queue for tracking workflow execution.
+"""Postgres-backed job queue for tracking workflow execution.
 
-Jobs are persisted to disk and survive server restarts.
+Jobs are persisted to Postgres and survive server restarts.
 SSE event queues remain in-memory (ephemeral by design).
 """
 
-import json
-import os
-import sqlite3
-import uuid
 import asyncio
+import json
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
 from threading import Lock
 from typing import Any, Optional
 
+from psycopg.types.json import Json
+
+from web.backend.db import apply_migrations, get_conn
 from web.backend.models import JobState
 
 
-# Database path - relative to project root
-_DEFAULT_DB_PATH = Path(__file__).parent.parent / "data" / "jobs.db"
-DB_PATH = Path(os.environ.get("HYDRA_DB_PATH", str(_DEFAULT_DB_PATH)))
-
-
-def _ensure_db_dir():
-    """Ensure the data directory exists."""
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-
-def _init_db():
+def _init_db() -> None:
     """Initialize the database schema if needed."""
-    _ensure_db_dir()
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS jobs (
-            id TEXT PRIMARY KEY,
-            state TEXT NOT NULL DEFAULT 'INITIALIZED',
-            success INTEGER DEFAULT 0,
-            created_at TEXT NOT NULL,
-            started_at TEXT,
-            completed_at TEXT,
-            job_description TEXT DEFAULT '',
-            resume TEXT DEFAULT '',
-            source_documents TEXT DEFAULT '',
-            model TEXT,
-            max_audit_retries INTEGER DEFAULT 2,
-            final_documents TEXT,
-            audit_report TEXT,
-            executive_brief TEXT,
-            intermediate_results TEXT DEFAULT '{}',
-            execution_log TEXT DEFAULT '[]',
-            error_message TEXT,
-            audit_failed INTEGER DEFAULT 0,
-            audit_error TEXT,
-            agent_models TEXT DEFAULT '{}',
-            gap_analysis_approved INTEGER DEFAULT 0,
-            interview_answers TEXT DEFAULT '[]'
-        )
-    """)
-    conn.commit()
-    conn.close()
+    apply_migrations()
 
 
 # Initialize DB on module load
@@ -69,7 +30,14 @@ _init_db()
 @dataclass
 class Job:
     """Represents a job in the queue."""
+
     id: str
+    company: Optional[str] = None
+    role_title: Optional[str] = None
+    source: Optional[str] = None
+    url: Optional[str] = None
+    hydra_job_id: Optional[str] = None
+    hydra_run_id: Optional[str] = None
     state: JobState = JobState.INITIALIZED
     success: bool = False
     created_at: datetime = field(default_factory=datetime.now)
@@ -93,7 +61,7 @@ class Job:
     audit_failed: bool = False
     audit_error: Optional[str] = None
     agent_models: dict[str, str] = field(default_factory=dict)
-    
+
     # User inputs for resume
     gap_analysis_approved: bool = False
     interview_answers: list[dict[str, Any]] = field(default_factory=list)
@@ -150,96 +118,92 @@ class Job:
         }
 
 
-def _serialize_datetime(dt: Optional[datetime]) -> Optional[str]:
-    """Convert datetime to ISO string for storage."""
-    return dt.isoformat() if dt else None
+def _deserialize_datetime(value: Optional[object]) -> Optional[datetime]:
+    """Convert stored value back to datetime."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        return datetime.fromisoformat(value)
+    return None
 
 
-def _deserialize_datetime(s: Optional[str]) -> Optional[datetime]:
-    """Convert ISO string back to datetime."""
-    return datetime.fromisoformat(s) if s else None
+def _coerce_json(value: Any, default: Any) -> Any:
+    if value is None:
+        return default
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return default
+    return value
 
 
-def _job_to_row(job: Job) -> tuple:
-    """Convert Job to database row."""
-    return (
-        job.id,
-        job.state.value,
-        1 if job.success else 0,
-        _serialize_datetime(job.created_at),
-        _serialize_datetime(job.started_at),
-        _serialize_datetime(job.completed_at),
-        job.job_description,
-        job.resume,
-        job.source_documents,
-        job.model,
-        job.max_audit_retries,
-        json.dumps(job.final_documents) if job.final_documents else None,
-        json.dumps(job.audit_report) if job.audit_report else None,
-        json.dumps(job.executive_brief) if job.executive_brief else None,
-        json.dumps(job.intermediate_results),
-        json.dumps(job.execution_log),
-        job.error_message,
-        1 if job.audit_failed else 0,
-        job.audit_error,
-        json.dumps(job.agent_models),
-        1 if job.gap_analysis_approved else 0,
-        json.dumps(job.interview_answers),
-    )
-
-
-def _row_to_job(row: tuple) -> Job:
+def _row_to_job(row: dict[str, Any]) -> Job:
     """Convert database row to Job."""
     return Job(
-        id=row[0],
-        state=JobState(row[1]),
-        success=bool(row[2]),
-        created_at=_deserialize_datetime(row[3]) or datetime.now(),
-        started_at=_deserialize_datetime(row[4]),
-        completed_at=_deserialize_datetime(row[5]),
-        job_description=row[6] or "",
-        resume=row[7] or "",
-        source_documents=row[8] or "",
-        model=row[9],
-        max_audit_retries=row[10] or 2,
-        final_documents=json.loads(row[11]) if row[11] else None,
-        audit_report=json.loads(row[12]) if row[12] else None,
-        executive_brief=json.loads(row[13]) if row[13] else None,
-        intermediate_results=json.loads(row[14]) if row[14] else {},
-        execution_log=json.loads(row[15]) if row[15] else [],
-        error_message=row[16],
-        audit_failed=bool(row[17]),
-        audit_error=row[18],
-        agent_models=json.loads(row[19]) if row[19] else {},
-        gap_analysis_approved=bool(row[20]) if len(row) > 20 else False,
-        interview_answers=json.loads(row[21]) if len(row) > 21 and row[21] else [],
+        id=row["id"],
+        company=row.get("company"),
+        role_title=row.get("role_title"),
+        source=row.get("source"),
+        url=row.get("url"),
+        hydra_job_id=row.get("hydra_job_id"),
+        hydra_run_id=row.get("hydra_run_id"),
+        state=JobState(row["state"]),
+        success=bool(row["success"]),
+        created_at=_deserialize_datetime(row.get("created_at")) or datetime.now(),
+        started_at=_deserialize_datetime(row.get("started_at")),
+        completed_at=_deserialize_datetime(row.get("completed_at")),
+        job_description=row.get("job_description") or "",
+        resume=row.get("resume") or "",
+        source_documents=row.get("source_documents") or "",
+        model=row.get("model"),
+        max_audit_retries=row.get("max_audit_retries") or 2,
+        final_documents=_coerce_json(row.get("final_documents"), None),
+        audit_report=_coerce_json(row.get("audit_report"), None),
+        executive_brief=_coerce_json(row.get("executive_brief"), None),
+        intermediate_results=_coerce_json(row.get("intermediate_results"), {}),
+        execution_log=_coerce_json(row.get("execution_log"), []),
+        error_message=row.get("error_message"),
+        audit_failed=bool(row.get("audit_failed")),
+        audit_error=row.get("audit_error"),
+        agent_models=_coerce_json(row.get("agent_models"), {}),
+        gap_analysis_approved=bool(row.get("gap_analysis_approved")),
+        interview_answers=_coerce_json(row.get("interview_answers"), []),
     )
 
 
 class JobQueue:
-    """Thread-safe SQLite-backed job storage."""
+    """Thread-safe Postgres-backed job storage."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._lock = Lock()
         # In-memory cache for active jobs (for SSE event queues)
         self._active_jobs: dict[str, Job] = {}
-
-    def _get_conn(self) -> sqlite3.Connection:
-        """Get a database connection."""
-        return sqlite3.connect(str(DB_PATH))
 
     def create_job(
         self,
         job_description: str,
         resume: str,
         source_documents: str = "",
+        company: Optional[str] = None,
+        role_title: Optional[str] = None,
+        source: Optional[str] = None,
+        url: Optional[str] = None,
         model: Optional[str] = None,
         max_audit_retries: int = 2,
     ) -> Job:
         """Create and store a new job."""
         job_id = str(uuid.uuid4())
+        safe_company = company or "Unknown Company"
+        safe_role = role_title or "Unknown Role"
         job = Job(
             id=job_id,
+            company=safe_company,
+            role_title=safe_role,
+            source=source,
+            url=url,
             job_description=job_description,
             resume=resume,
             source_documents=source_documents,
@@ -248,21 +212,59 @@ class JobQueue:
         )
 
         with self._lock:
-            conn = self._get_conn()
-            try:
-                conn.execute("""
-                    INSERT INTO jobs (
-                        id, state, success, created_at, started_at, completed_at,
+            with get_conn() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO job_queue (
+                        id, company, role_title, source, url, hydra_job_id, hydra_run_id,
+                        state, success, created_at, started_at, completed_at,
                         job_description, resume, source_documents, model, max_audit_retries,
                         final_documents, audit_report, executive_brief, intermediate_results,
                         execution_log, error_message, audit_failed, audit_error, agent_models,
                         gap_analysis_approved, interview_answers
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, _job_to_row(job))
+                    )
+                    VALUES (
+                        %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s,
+                        %s, %s
+                    )
+                    """,
+                    (
+                        job.id,
+                        job.company,
+                        job.role_title,
+                        job.source,
+                        job.url,
+                        job.hydra_job_id,
+                        job.hydra_run_id,
+                        job.state.value,
+                        job.success,
+                        job.created_at,
+                        job.started_at,
+                        job.completed_at,
+                        job.job_description,
+                        job.resume,
+                        job.source_documents,
+                        job.model,
+                        job.max_audit_retries,
+                        Json(job.final_documents) if job.final_documents is not None else None,
+                        Json(job.audit_report) if job.audit_report is not None else None,
+                        Json(job.executive_brief) if job.executive_brief is not None else None,
+                        Json(job.intermediate_results),
+                        Json(job.execution_log),
+                        job.error_message,
+                        job.audit_failed,
+                        job.audit_error,
+                        Json(job.agent_models),
+                        job.gap_analysis_approved,
+                        Json(job.interview_answers),
+                    ),
+                )
                 conn.commit()
-            finally:
-                conn.close()
-            
+
             # Cache for SSE events
             self._active_jobs[job_id] = job
 
@@ -276,18 +278,14 @@ class JobQueue:
                 return self._active_jobs[job_id]
 
         # Fetch from database
-        conn = self._get_conn()
-        try:
-            cursor = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))
-            row = cursor.fetchone()
+        with get_conn() as conn:
+            row = conn.execute("SELECT * FROM job_queue WHERE id = %s", (job_id,)).fetchone()
             if row:
                 job = _row_to_job(row)
                 with self._lock:
                     self._active_jobs[job_id] = job
                 return job
             return None
-        finally:
-            conn.close()
 
     def update_job(self, job_id: str, **kwargs) -> Optional[Job]:
         """Update job fields."""
@@ -295,84 +293,96 @@ class JobQueue:
             job = self._active_jobs.get(job_id)
             if not job:
                 # Load from DB if not in cache
-                conn = self._get_conn()
-                try:
-                    cursor = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))
-                    row = cursor.fetchone()
+                with get_conn() as conn:
+                    row = conn.execute("SELECT * FROM job_queue WHERE id = %s", (job_id,)).fetchone()
                     if row:
                         job = _row_to_job(row)
                         self._active_jobs[job_id] = job
-                finally:
-                    conn.close()
-            
+
             if not job:
                 return None
-            
+
             # Update in-memory object
             for key, value in kwargs.items():
                 if hasattr(job, key):
                     setattr(job, key, value)
-            
+
             # Persist to database
-            conn = self._get_conn()
-            try:
-                conn.execute("""
-                    UPDATE jobs SET
-                        state = ?, success = ?, started_at = ?, completed_at = ?,
-                        final_documents = ?, audit_report = ?, executive_brief = ?,
-                        intermediate_results = ?, execution_log = ?, error_message = ?,
-                        audit_failed = ?, audit_error = ?, agent_models = ?,
-                        gap_analysis_approved = ?, interview_answers = ?
-                    WHERE id = ?
-                """, (
-                    job.state.value,
-                    1 if job.success else 0,
-                    _serialize_datetime(job.started_at),
-                    _serialize_datetime(job.completed_at),
-                    json.dumps(job.final_documents) if job.final_documents else None,
-                    json.dumps(job.audit_report) if job.audit_report else None,
-                    json.dumps(job.executive_brief) if job.executive_brief else None,
-                    json.dumps(job.intermediate_results),
-                    json.dumps(job.execution_log),
-                    job.error_message,
-                    1 if job.audit_failed else 0,
-                    job.audit_error,
-                    json.dumps(job.agent_models),
-                    1 if job.gap_analysis_approved else 0,
-                    json.dumps(job.interview_answers),
-                    job_id,
-                ))
+            with get_conn() as conn:
+                conn.execute(
+                    """
+                    UPDATE job_queue SET
+                        company = %s,
+                        role_title = %s,
+                        source = %s,
+                        url = %s,
+                        hydra_job_id = %s,
+                        hydra_run_id = %s,
+                        state = %s,
+                        success = %s,
+                        started_at = %s,
+                        completed_at = %s,
+                        final_documents = %s,
+                        audit_report = %s,
+                        executive_brief = %s,
+                        intermediate_results = %s,
+                        execution_log = %s,
+                        error_message = %s,
+                        audit_failed = %s,
+                        audit_error = %s,
+                        agent_models = %s,
+                        gap_analysis_approved = %s,
+                        interview_answers = %s
+                    WHERE id = %s
+                    """,
+                    (
+                        job.company,
+                        job.role_title,
+                        job.source,
+                        job.url,
+                        job.hydra_job_id,
+                        job.hydra_run_id,
+                        job.state.value,
+                        job.success,
+                        job.started_at,
+                        job.completed_at,
+                        Json(job.final_documents) if job.final_documents is not None else None,
+                        Json(job.audit_report) if job.audit_report is not None else None,
+                        Json(job.executive_brief) if job.executive_brief is not None else None,
+                        Json(job.intermediate_results),
+                        Json(job.execution_log),
+                        job.error_message,
+                        job.audit_failed,
+                        job.audit_error,
+                        Json(job.agent_models),
+                        job.gap_analysis_approved,
+                        Json(job.interview_answers),
+                        job_id,
+                    ),
+                )
                 conn.commit()
-            finally:
-                conn.close()
-            
+
             return job
 
     def list_jobs(self, limit: int = 10, offset: int = 0) -> list[Job]:
         """List jobs with pagination."""
-        conn = self._get_conn()
-        try:
-            cursor = conn.execute(
-                "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                (limit, offset)
-            )
-            return [_row_to_job(row) for row in cursor.fetchall()]
-        finally:
-            conn.close()
+        with get_conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM job_queue ORDER BY created_at DESC LIMIT %s OFFSET %s",
+                (limit, offset),
+            ).fetchall()
+            return [_row_to_job(row) for row in rows]
 
     def delete_job(self, job_id: str) -> bool:
         """Delete a job by ID."""
         with self._lock:
             if job_id in self._active_jobs:
                 del self._active_jobs[job_id]
-        
-        conn = self._get_conn()
-        try:
-            cursor = conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+
+        with get_conn() as conn:
+            cursor = conn.execute("DELETE FROM job_queue WHERE id = %s", (job_id,))
             conn.commit()
             return cursor.rowcount > 0
-        finally:
-            conn.close()
 
 
 # Global job queue instance

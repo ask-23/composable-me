@@ -19,9 +19,11 @@ run_backend() {
     fi
     # Default DB path to a temp location to avoid persisting real inputs into the repo.
     export HYDRA_DB_PATH="${HYDRA_DB_PATH:-/tmp/hydra-jobs.db}"
+    # Default Postgres connection for Hydra persistence.
+    export HYDRA_DATABASE_URL="${HYDRA_DATABASE_URL:-postgresql://hydra:hydra@localhost:5432/hydra}"
     export PYTHONPATH="${PWD}:${PYTHONPATH}"
     if [ "${HYDRA_SKIP_PIP_INSTALL}" != "1" ]; then
-        pip install -q litestar uvicorn pydantic python-multipart sse-starlette python-dotenv 2>/dev/null
+        pip install -q litestar uvicorn pydantic python-multipart sse-starlette python-dotenv "psycopg[binary]" 2>/dev/null
     fi
     RELOAD_FLAG="--reload"
     if [ "${HYDRA_DISABLE_RELOAD}" = "1" ]; then

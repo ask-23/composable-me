@@ -1,0 +1,32 @@
+CREATE TABLE IF NOT EXISTS job_queue (
+    id TEXT PRIMARY KEY,
+    company TEXT,
+    role_title TEXT,
+    source TEXT,
+    url TEXT,
+    hydra_job_id UUID,
+    hydra_run_id UUID,
+    state TEXT NOT NULL DEFAULT 'initialized',
+    success BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    job_description TEXT NOT NULL DEFAULT '',
+    resume TEXT NOT NULL DEFAULT '',
+    source_documents TEXT NOT NULL DEFAULT '',
+    model TEXT,
+    max_audit_retries INTEGER NOT NULL DEFAULT 2,
+    final_documents JSONB,
+    audit_report JSONB,
+    executive_brief JSONB,
+    intermediate_results JSONB NOT NULL DEFAULT '{}'::jsonb,
+    execution_log JSONB NOT NULL DEFAULT '[]'::jsonb,
+    error_message TEXT,
+    audit_failed BOOLEAN NOT NULL DEFAULT FALSE,
+    audit_error TEXT,
+    agent_models JSONB NOT NULL DEFAULT '{}'::jsonb,
+    gap_analysis_approved BOOLEAN NOT NULL DEFAULT FALSE,
+    interview_answers JSONB NOT NULL DEFAULT '[]'::jsonb
+);
+
+CREATE INDEX IF NOT EXISTS job_queue_created_at_idx ON job_queue (created_at DESC);

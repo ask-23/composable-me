@@ -1,13 +1,17 @@
 """Async wrapper for running HydraWorkflow in background."""
 
 import asyncio
+import json
+import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
-import logging
 
-from web.backend.services.job_queue import Job, job_queue
 from web.backend.models import JobState
+from web.backend.services.hydra_db import hydra_db
+from web.backend.services.job_queue import Job, job_queue
 
 # Import from parent project
 from runtime.crewai.hydra_workflow import HydraWorkflow, WorkflowState
@@ -17,6 +21,118 @@ logger = logging.getLogger(__name__)
 
 # Thread pool for running blocking workflow operations
 _executor = ThreadPoolExecutor(max_workers=4)
+
+
+def _artifacts_base_dir() -> Path:
+    project_root = Path(__file__).parent.parent.parent
+    return Path(os.environ.get("HYDRA_ARTIFACTS_DIR", str(project_root / "out")))
+
+
+def _ensure_hydra_records(job: Job) -> None:
+    company = job.company or "Unknown Company"
+    role_title = job.role_title or "Unknown Role"
+
+    if not job.hydra_job_id:
+        hydra_job = hydra_db.create_job(
+            company=company,
+            role_title=role_title,
+            source=job.source,
+            url=job.url,
+            status="new",
+        )
+        job.hydra_job_id = str(hydra_job["id"])
+        hydra_db.create_job_description(job_id=job.hydra_job_id, jd_text=job.job_description)
+
+    if not job.hydra_run_id:
+        run = hydra_db.create_run(
+            job_id=job.hydra_job_id,
+            model_router=job.agent_models or None,
+            config={
+                "max_audit_retries": job.max_audit_retries,
+                "model": job.model,
+            },
+            outcome=None,
+        )
+        job.hydra_run_id = str(run["id"])
+
+    job_queue.update_job(
+        job.id,
+        company=company,
+        role_title=role_title,
+        source=job.source,
+        url=job.url,
+        hydra_job_id=job.hydra_job_id,
+        hydra_run_id=job.hydra_run_id,
+    )
+
+
+def _persist_hydra_results(job: Job) -> None:
+    if not job.hydra_job_id or not job.hydra_run_id:
+        return
+
+    outcome = "success" if job.success else "failed"
+    hydra_db.update_run(
+        run_id=job.hydra_run_id,
+        model_router=job.agent_models or None,
+        config={
+            "max_audit_retries": job.max_audit_retries,
+            "model": job.model,
+        },
+        outcome=outcome,
+    )
+
+    # Persist interview Q&A if available and not already stored.
+    interrogation = job.intermediate_results.get("interrogation", {}) if job.intermediate_results else {}
+    questions = interrogation.get("questions", []) if isinstance(interrogation, dict) else []
+    answers = job.interview_answers or interrogation.get("interview_notes", [])
+    if (questions or answers) and not hydra_db.list_interviews(job.hydra_run_id):
+        structured_notes = interrogation if isinstance(interrogation, dict) and interrogation else {
+            "questions": questions,
+            "answers": answers,
+        }
+        hydra_db.create_interview(
+            run_id=job.hydra_run_id,
+            questions=questions,
+            answers=answers,
+            structured_notes=structured_notes,
+        )
+
+    base_dir = _artifacts_base_dir()
+    company = job.company or "Unknown Company"
+    role_title = job.role_title or "Unknown Role"
+
+    if job.final_documents:
+        resume = job.final_documents.get("resume")
+        if resume:
+            hydra_db.create_artifact_with_disk_write(
+                base_dir=base_dir,
+                company=company,
+                role_title=role_title,
+                run_id=job.hydra_run_id,
+                kind="resume",
+                content=resume,
+            )
+        cover_letter = job.final_documents.get("cover_letter")
+        if cover_letter:
+            hydra_db.create_artifact_with_disk_write(
+                base_dir=base_dir,
+                company=company,
+                role_title=role_title,
+                run_id=job.hydra_run_id,
+                kind="cover_letter",
+                content=cover_letter,
+            )
+
+    if job.audit_report:
+        audit_content = json.dumps(job.audit_report, indent=2, sort_keys=True)
+        hydra_db.create_artifact_with_disk_write(
+            base_dir=base_dir,
+            company=company,
+            role_title=role_title,
+            run_id=job.hydra_run_id,
+            kind="audit_report",
+            content=audit_content,
+        )
 
 
 def _map_workflow_state(state: WorkflowState) -> JobState:
@@ -45,6 +161,9 @@ def _run_workflow_sync(job: Job) -> None:
     This is the blocking function that actually executes the workflow.
     """
     try:
+        job.started_at = datetime.now()
+        job_queue.update_job(job.id, started_at=job.started_at, state=job.state)
+
         # Initialize LLM client
         llm = get_llm_client(model=job.model)
 
@@ -82,6 +201,10 @@ def _run_workflow_sync(job: Job) -> None:
         if job.state not in (JobState.GAP_ANALYSIS_REVIEW, JobState.INTERROGATION_REVIEW):
             job.completed_at = datetime.now()
 
+        _ensure_hydra_records(job)
+        _persist_hydra_results(job)
+        job_queue.update_job(job.id)
+
         logger.info(f"Job {job.id} completed: success={job.success}, state={job.state}")
 
     except Exception as e:
@@ -90,6 +213,9 @@ def _run_workflow_sync(job: Job) -> None:
         job.success = False
         job.completed_at = datetime.now()
         job.error_message = str(e)
+        _ensure_hydra_records(job)
+        _persist_hydra_results(job)
+        job_queue.update_job(job.id)
 
 
 async def _poll_workflow_state(job: Job, workflow: HydraWorkflow) -> None:
@@ -140,6 +266,7 @@ async def run_workflow_async(job: Job) -> None:
     """
     job.started_at = datetime.now()
     job.state = JobState.INITIALIZED
+    job_queue.update_job(job.id, started_at=job.started_at, state=job.state)
 
     # Emit started event
     await job.emit_event("started", {
@@ -159,6 +286,7 @@ async def run_workflow_async(job: Job) -> None:
         
         # Store agent_models immediately so it's available
         job.agent_models = workflow.agent_models
+        _ensure_hydra_records(job)
 
         # Build context (include previous results for resuming)
         context = {
@@ -258,10 +386,13 @@ async def run_workflow_async(job: Job) -> None:
 
         # Pause states are not terminal: keep SSE stream alive and do not mark completed.
         if job.state in (JobState.GAP_ANALYSIS_REVIEW, JobState.INTERROGATION_REVIEW):
+            job_queue.update_job(job.id)
             return
 
         # Terminal-ish: mark completion and emit completion event.
         job.completed_at = datetime.now()
+        _persist_hydra_results(job)
+        job_queue.update_job(job.id)
         await job.emit_event("complete", job.get_complete_event_payload())
 
     except Exception as e:
@@ -269,6 +400,10 @@ async def run_workflow_async(job: Job) -> None:
         job.state = JobState.FAILED
         job.error_message = str(e)
         job.completed_at = datetime.now()
+
+        _ensure_hydra_records(job)
+        _persist_hydra_results(job)
+        job_queue.update_job(job.id)
 
         await job.emit_event("error", {
             "job_id": job.id,

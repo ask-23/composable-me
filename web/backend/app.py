@@ -23,6 +23,7 @@ from litestar.logging import LoggingConfig
 
 from web.backend.routes.health import HealthController
 from web.backend.routes.jobs import JobsController
+from web.backend.db import apply_migrations
 
 # Configure logging
 logging_config = LoggingConfig(
@@ -34,6 +35,12 @@ logging_config = LoggingConfig(
     },
     log_exceptions="always",
 )
+
+# Apply migrations on startup for local development
+try:
+    apply_migrations()
+except Exception as exc:
+    logging.error("Database migrations failed: %s", exc)
 
 # Configure CORS for local development
 cors_config = CORSConfig(
