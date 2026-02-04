@@ -73,7 +73,7 @@ narrative_candidates:
   - thread: "Enterprise scale, startup speed"
     evidence:
       - "[Previous Company C], [Previous Company D] experience"
-      - "Startup roles at [Previous Company B], Agora"
+      - "Startup roles at [Previous Company B], [Previous Company A]"
     resonance: "Can operate at both ends"
   
   - thread: "Technical depth + business communication"

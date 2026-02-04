@@ -108,7 +108,7 @@ coverage_analysis:
     synonym_match:
       - keyword: "CI/CD"
         found_as: "continuous integration"
-        locations: ["Agora role"]
+        locations: ["[Previous Company A] role"]
         note: "Consider adding exact 'CI/CD' term"
   
   missing_but_claimable:

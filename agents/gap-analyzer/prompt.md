@@ -184,7 +184,8 @@ Return ONLY valid JSON matching this structure:
         "text": "5+ years AWS experience",
         "type": "explicit_hard",
         "classification": "direct_match",
-        "evidence": "- [Current Company] (2023-present): Multi-account AWS architecture\n- Agora (2022-2023): AWS infrastructure\n- [Previous Company B] (2019-2021): AWS cloud services\n- [Previous Company C] (2017-2019): AWS implementation\nTotal: 6+ years",
+        "evidence": "- [Current Company] (2023-present): Multi-account AWS architecture\n- [Previous Company A] (2022-2023): AWS infrastructure\n- [Previous Company B] (2019-2021): AWS cloud services\n- [Previous Company C] (2017-2019): AWS implementation\nTotal: 6+ years",
+        "fit": "Compatible with startup experience at [Previous Company B], [Previous Company A]",
         "confidence": "high",
         "interview_needed": false,
         "framing": null
