@@ -62,14 +62,14 @@ class TestTailoringAgent:
             "tailored_resume": {
                 "format": "markdown",
                 "content": """# John Doe
-Seattle, WA | john@example.com | (555) 123-4567 | linkedin.com/in/johndoe
+Seattle, WA | user@example.com | 555-555-5555 | linkedin.com/in/johndoe
 
 ## Summary
 Platform Engineer who builds systems that eliminate bottlenecks. 5+ years AWS experience with focus on developer velocity and infrastructure automation.
 
 ## Experience
 
-### Senior Platform Engineer | TechCorp
+### Senior Platform Engineer | Company A
 2020 – Present | Seattle, WA
 
 - Built CI/CD pipeline reducing deploy time from 45min to 8min
@@ -80,15 +80,15 @@ Platform Engineer who builds systems that eliminate bottlenecks. 5+ years AWS ex
 AWS, Terraform, CI/CD, Docker, Kubernetes, Python, Infrastructure as Code
 
 ## Education
-BS Computer Science | University of Washington | 2018"""
+BS Computer Science | Example University | 2018"""
             },
             "cover_letter": {
                 "format": "markdown",
                 "content": """Dear Hiring Team,
 
-At TechCorp, I built the CI/CD system that let 40 developers ship without waiting for ops approval. Before that, deploys took 45 minutes. After, they took 8 minutes. Your job description mentions "developer velocity" three times—that's exactly what I do.
+At Company A, I built the CI/CD system that let 40 developers ship without waiting for ops approval. Before that, deploys took 45 minutes. After, they took 8 minutes. Your job description mentions "developer velocity" three times—that's exactly what I do.
 
-I specialize in building systems that eliminate bottlenecks, including myself. At TechCorp, I architected the multi-account AWS infrastructure that passed SOC2 audit on first attempt. The compliance team said it was the cleanest they'd seen from a startup. This matches your need for someone who can scale infrastructure while maintaining security standards.
+I specialize in building systems that eliminate bottlenecks, including myself. At Company A, I architected multi-account AWS infrastructure that passed a compliance audit on the first attempt. This matches your need for someone who can scale infrastructure while maintaining security standards.
 
 Your platform team is building developer tools. I've done this before. My team reduced infrastructure tickets by 80% through self-service tooling. Developers provision environments in minutes, not days. That's the kind of developer experience your JD describes.
 
@@ -99,7 +99,7 @@ John Doe""",
                 "word_count": 287
             },
             "sources_used": [
-                "resume - TechCorp experience",
+                "resume - Company A experience",
                 "interview_notes - CI/CD pipeline details",
                 "differentiators - bottleneck elimination theme"
             ]

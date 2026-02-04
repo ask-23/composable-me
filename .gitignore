@@ -39,6 +39,7 @@ env/
 *.swp
 *.swo
 *~
+.serena/
 .DS_Store
 
 # Testing
@@ -62,6 +63,7 @@ output/
 # Kiro (keep specs and steering, ignore other Kiro files)
 .kiro/cache/
 .kiro/logs/
+.kiro/work-streams/
 
 # OS
 .DS_Store
@@ -71,9 +73,12 @@ Thumbs.db
 *.tmp
 *.bak
 *.swp
+pr*.txt
+warp_theme_screenshot*.png
 
 # Node
 node_modules/
+web/frontend/.astro/
 
 # Playwright
 test-results/
@@ -81,7 +86,16 @@ playwright-report/
 playwright/.cache/
 
 # PII and sensitive files
-*[CANDIDATE NAME]*
+hydra_job*_*.md
+hydra_job*_*.csv
+hydra_job*_*.json
+datagrip-*.xml
+.junie/
+docs/*superprompt*.md
+docs/*prompt*.md
+*resume*
+*Resume*
+*_jd*
 .env
 .env.*
 !.env.example
@@ -89,5 +103,4 @@ playwright/.cache/
 .worktrees/
 inputs/
 outputs/
-job_e93843be_full_results.json
-hydra_job07_nttdata_report.md
+job_*_full_results.json

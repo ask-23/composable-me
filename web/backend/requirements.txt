@@ -15,4 +15,4 @@ opentelemetry-instrumentation>=0.41b0
 opentelemetry-instrumentation-asgi>=0.41b0
 
 # Reference parent package for HydraWorkflow
-# Run with: PYTHONPATH=/Users/admin/git/composable-crew python -m uvicorn app:app
+# Run with: PYTHONPATH=<REPO_ROOT> python -m uvicorn app:app

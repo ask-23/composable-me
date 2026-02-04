@@ -1,4 +1,4 @@
-#!/Users/admin/git/hydra-claude/.venv/bin/python
+#!/usr/bin/env python3
 """
 Composable Me Hydra — Quick CrewAI Runner
 
