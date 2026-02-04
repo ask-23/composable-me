@@ -81,6 +81,12 @@ warp_theme_screenshot*.png
 node_modules/
 web/frontend/.astro/
 
+# Compiled binaries
+cli/composable-crew-cli
+
+# IDE/tool metadata
+.kilocode/
+
 # Playwright
 test-results/
 playwright-report/
