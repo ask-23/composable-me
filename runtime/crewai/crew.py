@@ -25,6 +25,18 @@ from crewai import LLM
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+DEFAULT_TRUTH_RULES = """\
+1. Do not fabricate experience, tools, metrics, or outcomes.
+2. Keep chronology consistent with provided sources.
+3. If a claim cannot be supported by inputs, omit it or ask for clarification.
+""".strip()
+
+DEFAULT_STYLE_GUIDE = """\
+- Prefer concrete details over hype.
+- Avoid generic corporate phrases and AI clichés.
+- Use clear, concise language and varied sentence lengths.
+""".strip()
+
 
 def load_prompt(agent_name: str) -> str:
     """Load agent prompt from agents/{agent_name}/prompt.md"""
@@ -95,8 +107,8 @@ class HydraCrew:
         """Create all Hydra agents with their prompts."""
         
         # Core context all agents need
-        truth_rules = self.docs.get("AGENTS.MD", "")
-        style_guide = self.docs.get("STYLE_GUIDE.MD", "")
+        truth_rules = self.docs.get("AGENTS.MD", DEFAULT_TRUTH_RULES)
+        style_guide = self.docs.get("STYLE_GUIDE.MD", DEFAULT_STYLE_GUIDE)
         
         # COMMANDER
         self.commander = Agent(

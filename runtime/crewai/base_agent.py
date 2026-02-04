@@ -24,6 +24,18 @@ MIN_CONFIDENCE = 0.0
 MAX_CONFIDENCE = 1.0
 DEFAULT_MAX_RETRIES = 1
 
+DEFAULT_TRUTH_RULES = """\
+1. Do not fabricate experience, tools, metrics, or outcomes.
+2. Keep chronology consistent with provided sources.
+3. If a claim cannot be supported by inputs, omit it or ask for clarification.
+""".strip()
+
+DEFAULT_STYLE_GUIDE = """\
+- Prefer concrete details over hype.
+- Avoid generic corporate phrases and AI clichés.
+- Use clear, concise language and varied sentence lengths.
+""".strip()
+
 
 class ValidationError(Exception):
     """Raised when agent output validation fails"""
@@ -85,7 +97,7 @@ class BaseHydraAgent(ABC):
         if agents_file.exists():
             return agents_file.read_text()
         
-        return ""
+        return DEFAULT_TRUTH_RULES
     
     def _load_style_guide(self) -> str:
         """Load STYLE_GUIDE.MD"""
@@ -95,7 +107,7 @@ class BaseHydraAgent(ABC):
         if style_file.exists():
             return style_file.read_text()
         
-        return ""
+        return DEFAULT_STYLE_GUIDE
     
     def create_agent(self) -> Agent:
         """Create CrewAI agent with prompt and rules"""

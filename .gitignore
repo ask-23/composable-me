@@ -73,6 +73,7 @@ Thumbs.db
 *.tmp
 *.bak
 *.swp
+replacements.txt
 pr*.txt
 warp_theme_screenshot*.png
 
@@ -86,6 +87,12 @@ playwright-report/
 playwright/.cache/
 
 # PII and sensitive files
+.kiro/
+.husky/
+docs/
+scripts/
+package-lock.json
+web/frontend/package-lock.json
 hydra_job*_*.md
 hydra_job*_*.csv
 hydra_job*_*.json

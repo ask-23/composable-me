@@ -522,7 +522,6 @@ composable-crew/
 ├── runtime/crewai/        # Core runtime & orchestration
 ├── agents/                # Agent prompt templates
 ├── web/                   # Optional UI (Astro + Litestar)
-├── docs/                  # Architecture & truth rules
 ├── tests/                 # pytest + E2E tests
 ├── examples/              # Sample inputs
 └── run.sh                 # Primary entry point
