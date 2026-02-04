@@ -87,3 +87,7 @@ playwright/.cache/
 !.env.example
 *.db
 .worktrees/
+inputs/
+outputs/
+job_e93843be_full_results.json
+hydra_job07_nttdata_report.md
