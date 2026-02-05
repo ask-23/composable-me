@@ -12,7 +12,7 @@ Composable Me is a multi-agent system that creates tailored résumés and cover 
 git clone https://github.com/ask-23/composable-me.git
 cd composable-me
 cp .env.example .env   # Add your LLM API key
-./run.sh --jd job.md --resume resume.md --out output/
+./run.sh --jd your_job_description.md --resume your_resume.md --out output/
 ```
 
 That's it. Your tailored application materials will be in `output/`.
@@ -101,11 +101,11 @@ python -m runtime.crewai.cli --help
 
 Set one of these in your `.env` file:
 
-```bash
-TOGETHER_API_KEY=tgp_v1_...      # Together AI
-CHUTES_API_KEY=cpk_...           # Chutes
-OPENROUTER_API_KEY=sk-or-...     # OpenRouter (for Claude)
-```
+| Provider | Link | Key Format |
+|----------|------|------------|
+| Together AI | https://together.ai | `TOGETHER_API_KEY=tgp_v1_...` |
+| Chutes | https://chutes.ai | `CHUTES_API_KEY=cpk_...` |
+| OpenRouter | https://openrouter.ai | `OPENROUTER_API_KEY=sk-or-...` |
 
 The CLI uses the first available key.
 
@@ -118,6 +118,9 @@ docker run -d --name hydra-db \
   -e POSTGRES_PASSWORD=hydra \
   -e POSTGRES_DB=hydra \
   -p 5432:5432 postgres:16
+
+# Set database URL
+export HYDRA_DATABASE_URL=postgresql://hydra:hydra@localhost:5432/hydra
 
 # Run migrations
 PYTHONPATH="$(pwd)" python -m web.backend.db.migrate
@@ -140,7 +143,7 @@ composable-me/
 ├── agents/           # Agent prompt templates
 ├── web/              # Optional web UI (Astro + Litestar)
 ├── tests/            # pytest + Playwright tests
-├── examples/         # Sample inputs to try
+├── examples/         # Template inputs (fill in with your details)
 └── run.sh            # CLI entry point
 ```
 
