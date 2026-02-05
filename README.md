@@ -364,8 +364,8 @@ Coordination happens at the orchestration layer.
 
 
 ```
-git clone https://github.com/ask-23/composable-crew.git
-cd composable-crew
+git clone https://github.com/ask-23/composable-me.git
+cd composable-me
 
 cp .env.example .env
 # Add at least one LLM API key
@@ -518,7 +518,7 @@ cd web/frontend && npm install && npm run dev
 
 
 ```
-composable-crew/
+composable-me/
 ├── runtime/crewai/        # Core runtime & orchestration
 ├── agents/                # Agent prompt templates
 ├── web/                   # Optional UI (Astro + Litestar)
