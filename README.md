@@ -4,6 +4,8 @@
 
 Composable Me is a multi-agent system that creates tailored résumés and cover letters from your real experience—without fabricating skills, inflating metrics, or distorting timelines.
 
+This repository is intentionally public: it demonstrates how I design, constrain, and execute complex AI systems end-to-end.
+
 ![Composable Me Web Interface](docs/assets/composable-me-screenshot.webp)
 
 ## Quick Start
@@ -199,6 +201,8 @@ This project is intentionally constrained. Those constraints *are* the product.
 2. **Chronology is immutable** — Dates and sequences are never altered
 3. **Failing is acceptable** — Silent degradation is a defect
 4. **Human-in-the-loop** — Automation stops where judgment begins
+5. **Legibility over cleverness** — The system is designed to be understood, audited, and reasoned about by humans, not just models.
+6. **Opinionated defaults** — The system encodes strong opinions so users don’t have to invent policy under pressure.
 
 ## License
 
