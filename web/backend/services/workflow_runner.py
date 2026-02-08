@@ -206,7 +206,7 @@ async def run_workflow_async(job: Job) -> None:
                 for entry in new_entries:
                     await job.emit_event("log", {"message": entry})
 
-            # Emit intermediate results
+            # Emit intermediate results and persist to DB
             intermediate = workflow.get_intermediate_results()
             for stage, stage_result in intermediate.items():
                 if stage not in emitted_stages:
@@ -216,6 +216,8 @@ async def run_workflow_async(job: Job) -> None:
                         "stage": stage,
                         "result": stage_result,
                     })
+                    # Persist intermediate results after each stage (PR1 fix)
+                    job_queue.update_job(job.id)
 
         # Get the result from the future
         result = future.result()
@@ -258,10 +260,14 @@ async def run_workflow_async(job: Job) -> None:
 
         # Pause states are not terminal: keep SSE stream alive and do not mark completed.
         if job.state in (JobState.GAP_ANALYSIS_REVIEW, JobState.INTERROGATION_REVIEW):
+            # Persist pause state to DB so job can be resumed (PR1 fix)
+            job_queue.update_job(job.id)
             return
 
         # Terminal-ish: mark completion and emit completion event.
         job.completed_at = datetime.now()
+        # Persist final state to DB (PR1 fix)
+        job_queue.update_job(job.id)
         await job.emit_event("complete", job.get_complete_event_payload())
 
     except Exception as e:
@@ -269,6 +275,8 @@ async def run_workflow_async(job: Job) -> None:
         job.state = JobState.FAILED
         job.error_message = str(e)
         job.completed_at = datetime.now()
+        # Persist error state to DB (PR1 fix)
+        job_queue.update_job(job.id)
 
         await job.emit_event("error", {
             "job_id": job.id,
