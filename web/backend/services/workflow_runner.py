@@ -12,6 +12,8 @@ from typing import Optional
 from web.backend.models import JobState
 from web.backend.services.hydra_db import hydra_db
 from web.backend.services.job_queue import Job, job_queue
+from web.backend.observability.sse_errors import build_error_payload_from_exception
+from web.backend.observability.sentry import capture_error, set_job_context
 
 # Import from parent project
 from runtime.crewai.hydra_workflow import HydraWorkflow, WorkflowState
@@ -405,10 +407,20 @@ async def run_workflow_async(job: Job) -> None:
         _persist_hydra_results(job)
         job_queue.update_job(job.id)
 
-        await job.emit_event("error", {
-            "job_id": job.id,
-            "error": str(e),
-        })
+        # Capture to Sentry with job context
+        sentry_event_id = capture_error(
+            e,
+            stage=job.state.value if job.state else "unknown",
+        ) or ""
+
+        # Emit structured SSE error payload with PII redaction
+        error_payload = build_error_payload_from_exception(
+            job_id=job.id,
+            error=e,
+            stage=job.state.value if job.state else "",
+            sentry_event_id=sentry_event_id,
+        )
+        await job.emit_event("error", error_payload)
 
 
 def start_workflow_background(job: Job) -> None:
