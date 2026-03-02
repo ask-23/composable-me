@@ -1,11 +1,12 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from litestar.testing import TestClient
-from web.backend.app import app
 
 @pytest.fixture
 def test_client():
     """Create a Litestar TestClient"""
+    from litestar.testing import TestClient
+    from web.backend.app import app
+
     with TestClient(app=app) as client:
         yield client
 

@@ -49,6 +49,8 @@ def apply_migrations() -> None:
                     (migration.name,),
                 )
 
+        conn.commit()
+
 
 def main() -> None:
     apply_migrations()

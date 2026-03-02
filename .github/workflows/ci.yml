@@ -194,9 +194,9 @@ jobs:
         working-directory: web/frontend
         run: npx playwright install --with-deps chromium
 
-      - name: Run E2E regression tests (Chromium only)
+      - name: Run E2E tests (Chromium only)
         working-directory: web/frontend
-        run: npx playwright test --project=chromium --grep @regression
+        run: npx playwright test --project=chromium
         env:
           PYTHONPATH: ${{ github.workspace }}
           BACKEND_URL: http://localhost:18000
