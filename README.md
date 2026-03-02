@@ -1,3 +1,12 @@
+[![CI](https://github.com/ask-23/composable-me/actions/workflows/ci.yml/badge.svg)](https://github.com/ask-23/composable-me/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![Node 20](https://img.shields.io/badge/node-20-green?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Astro 5](https://img.shields.io/badge/astro-5-ff5d01?logo=astro&logoColor=white)](https://astro.build/)
+[![Svelte 5](https://img.shields.io/badge/svelte-5-ff3e00?logo=svelte&logoColor=white)](https://svelte.dev/)
+[![CrewAI](https://img.shields.io/badge/crewai-0.86%2B-purple)](https://www.crewai.com/)
+[![Litestar](https://img.shields.io/badge/litestar-2.0%2B-yellow)](https://litestar.dev/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-brightgreen)](LICENSE)
+
 # Composable Me
 
 **Generate job applications that tell the truth.**
