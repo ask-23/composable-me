@@ -33,6 +33,7 @@ test.describe('User Experience Audit', () => {
     });
 
     test('complete workflow capturing all user-visible issues', async ({ page }) => {
+        test.skip(!!process.env.CI, 'Requires Docker app running at localhost:4321');
         // 10 minute timeout for full LLM workflow
         test.setTimeout(600000);
 

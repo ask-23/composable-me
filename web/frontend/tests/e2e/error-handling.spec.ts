@@ -262,7 +262,21 @@ test.describe('Error Handling - Failed Jobs', () => {
                 error_message: errorMsg,
             },
         });
-        await mockSSEError(page, errorMsg, jobId);
+
+        // For already-failed jobs, SSE should reflect the failed state
+        // (not replay a processing error stream)
+        const events = [
+            mockSSEEvents.connected('failed', 0),
+            mockSSEEvents.complete({
+                success: false,
+                state: 'failed',
+                error_message: errorMsg,
+                final_documents: undefined,
+                audit_report: undefined,
+                executive_brief: undefined,
+            }),
+        ];
+        await mockSSEStream(page, { events, jobId });
 
         await page.goto(`/jobs/${jobId}?mock`);
 

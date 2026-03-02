@@ -230,7 +230,11 @@ test.describe('Results Viewer - Verdict Badges', () => {
                 executive_brief: undefined,
             },
         });
-        await mockSSEComplete(page, jobId);
+        await mockSSEComplete(page, jobId, {
+            final_documents: mockFinalDocuments,
+            audit_report: mockAuditReportRejected,
+            executive_brief: undefined,
+        });
 
         await page.goto(`/jobs/${jobId}?mock`);
         await page.locator('.results-viewer').waitFor({ state: 'visible', timeout: 10000 });
@@ -254,7 +258,13 @@ test.describe('Results Viewer - Verdict Badges', () => {
                 audit_report: undefined,
             },
         });
-        await mockSSEComplete(page, jobId);
+        await mockSSEComplete(page, jobId, {
+            final_documents: mockFinalDocuments,
+            audit_report: undefined,
+            executive_brief: undefined,
+            audit_failed: true,
+            audit_error: 'Audit did not complete successfully',
+        });
 
         await page.goto(`/jobs/${jobId}?mock`);
         await page.locator('.results-viewer').waitFor({ state: 'visible', timeout: 10000 });
@@ -287,7 +297,10 @@ test.describe('Results Viewer - Audit Panel', () => {
                 audit_report: mockAuditReportRejected,
             },
         });
-        await mockSSEComplete(page, jobId);
+        await mockSSEComplete(page, jobId, {
+            final_documents: mockFinalDocuments,
+            audit_report: mockAuditReportRejected,
+        });
 
         await page.goto(`/jobs/${jobId}?mock`);
         await page.locator('.results-viewer').waitFor({ state: 'visible', timeout: 10000 });
@@ -311,7 +324,10 @@ test.describe('Results Viewer - Audit Panel', () => {
                 audit_report: mockAuditReportCrashed,
             },
         });
-        await mockSSEComplete(page, jobId);
+        await mockSSEComplete(page, jobId, {
+            final_documents: mockFinalDocuments,
+            audit_report: mockAuditReportCrashed,
+        });
 
         await page.goto(`/jobs/${jobId}?mock`);
         await page.locator('.results-viewer').waitFor({ state: 'visible', timeout: 10000 });

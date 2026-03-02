@@ -147,7 +147,7 @@ jobs:
   e2e-regression:
     runs-on: ubuntu-latest
     needs: [frontend-checks]
-    continue-on-error: true  # E2E tests report results but don't block CI
+    # E2E tests are blocking — all must pass
     services:
       postgres:
         image: postgres:16

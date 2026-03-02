@@ -177,7 +177,20 @@ test.describe('Job Progress Page - Mocked SSE', () => {
                 success: false,
             },
         });
-        await mockSSEError(page, 'Processing failed', jobId);
+
+        // For already-failed jobs, SSE should reflect the failed state
+        const events = [
+            mockSSEEvents.connected('failed', 0),
+            mockSSEEvents.complete({
+                success: false,
+                state: 'failed',
+                error_message: 'Processing failed',
+                final_documents: undefined,
+                audit_report: undefined,
+                executive_brief: undefined,
+            }),
+        ];
+        await mockSSEStream(page, { events, jobId });
 
         await page.goto(`/jobs/${jobId}?mock`);
 

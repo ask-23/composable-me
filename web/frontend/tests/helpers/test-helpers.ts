@@ -16,7 +16,7 @@ import {
     SAMPLE_JOB_DESCRIPTION,
     SAMPLE_RESUME,
 } from '../fixtures/mock-responses';
-import type { Job, JobState } from '../../src/lib/types';
+import type { Job, JobState, SSECompleteEvent } from '../../src/lib/types';
 
 // ----- API Route Mocking -----
 
@@ -147,13 +147,19 @@ export async function mockSSEStream(
 }
 
 /**
- * Mock SSE stream that immediately completes with success
+ * Mock SSE stream that immediately completes with success.
+ * Pass completeOverrides to customize the complete event data
+ * (e.g., different audit_report, executive_brief, or failed state).
  */
-export async function mockSSEComplete(page: Page, jobId: string = 'mock-job-123'): Promise<void> {
+export async function mockSSEComplete(
+    page: Page,
+    jobId: string = 'mock-job-123',
+    completeOverrides?: Partial<SSECompleteEvent>,
+): Promise<void> {
     const events = [
         mockSSEEvents.connected('initialized', 0),
         mockSSEEvents.progress('completed', 100),
-        mockSSEEvents.complete(),
+        mockSSEEvents.complete(completeOverrides),
     ];
     await mockSSEStream(page, { events, jobId });
 }
