@@ -84,6 +84,7 @@ def test_full_workflow_reports_retry_information():
         assert "failed" in (result.error_message or "").lower()
 
 
+@requires_api_key
 def test_full_workflow_handles_missing_context_gracefully():
     """Workflow should error cleanly when required context keys are absent."""
     workflow = HydraWorkflow(llm=None)

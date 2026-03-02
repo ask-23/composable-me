@@ -19,6 +19,24 @@ on:
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hydra
+          POSTGRES_PASSWORD: hydra
+          POSTGRES_DB: hydra_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hydra"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      HYDRA_DATABASE_URL: postgresql://hydra:hydra@localhost:5432/hydra_test
+
     steps:
       - uses: actions/checkout@v4
 
@@ -88,14 +106,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: web/frontend/package-lock.json
 
       - name: Install dependencies
-        run: |
-          npm ci
-          # Lockfile generated on macOS may lack linux-x64 rollup binary
-          npm install @rollup/rollup-linux-x64-gnu --no-save 2>/dev/null || true
+        run: npm install
 
       - name: Type check
         run: npx astro check
@@ -172,12 +185,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: web/frontend/package-lock.json
 
       - name: Install Node dependencies
         working-directory: web/frontend
-        run: npm ci
+        run: npm install
 
       - name: Install Playwright browsers
         working-directory: web/frontend
