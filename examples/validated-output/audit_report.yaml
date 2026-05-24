@@ -1,0 +1,145 @@
+run:
+  example_id: validated-output-synthetic-001
+  generated_at: "2026-05-23 21:18:42 GMT"
+  inputs:
+    job_description: job_description.md
+    source_resume: source_resume.md
+  outputs:
+    resume: resume.md
+    cover_letter: cover_letter.md
+  policy:
+    unsupported_claims: reject
+    chronology_changes: reject
+    metric_invention: reject
+
+summary:
+  total_claims_reviewed: 18
+  supported_claims: 16
+  rejected_claims: 2
+  final_outputs_contain_rejected_claims: false
+
+claims:
+  - id: C001
+    artifact: resume.md
+    text: "Senior infrastructure and platform engineer with 8 years of experience"
+    status: supported
+    source:
+      file: source_resume.md
+      evidence: "Infrastructure engineer with 8 years of experience"
+  - id: C002
+    artifact: resume.md
+    text: "building AWS platforms, Terraform automation, CI/CD workflows, container delivery paths, and production observability"
+    status: supported
+    source:
+      file: source_resume.md
+      evidence: "AWS platforms, Terraform modules, CI/CD workflows, and production observability"
+  - id: C003
+    artifact: resume.md
+    text: "Owned AWS account baseline automation for 12 production and non-production accounts"
+    status: supported
+    source:
+      file: source_resume.md
+      evidence: "Owned AWS account baseline automation for 12 production and non-production accounts"
+  - id: C004
+    artifact: resume.md
+    text: "Built a self-service deployment workflow that reduced average service onboarding from 3 days to 4 hours"
+    status: supported
+    source:
+      file: source_resume.md
+      evidence: "reduced average service onboarding from 3 days to 4 hours"
+  - id: C005
+    artifact: resume.md
+    text: "Led incident response improvements after a queue saturation event"
+    status: supported
+    source:
+      file: source_resume.md
+      evidence: "Led incident response improvements after a queue saturation event"
+  - id: C006
+    artifact: resume.md
+    text: "adding runbooks, CloudWatch dashboards, and weekly postmortem review"
+    status: supported
+    source:
+      file: source_resume.md
+      evidence: "adding runbooks, CloudWatch dashboards, and weekly postmortem review"
+  - id: C007
+    artifact: resume.md
+    text: "Partnered with security to tighten IAM role boundaries, rotate stale secrets, and document access review evidence"
+    status: supported
+    source:
+      file: source_resume.md
+      evidence: "Partnered with security to tighten IAM role boundaries, rotate stale secrets, and document access review evidence"
+  - id: C008
+    artifact: resume.md
+    text: "Mentored 5 engineers"
+    status: supported
+    source:
+      file: source_resume.md
+      evidence: "Mentored 5 engineers"
+  - id: C009
+    artifact: resume.md
+    text: "led a 4-person migration from manually managed networking rules to reviewed Terraform changes"
+    status: supported
+    source:
+      file: source_resume.md
+      evidence: "led a 4-person migration from manually managed networking rules to reviewed Terraform changes"
+  - id: C010
+    artifact: resume.md
+    text: "Maintained Kubernetes clusters for customer-facing APIs"
+    status: supported
+    source:
+      file: source_resume.md
+      evidence: "Maintained Kubernetes clusters for customer-facing APIs"
+  - id: C011
+    artifact: resume.md
+    text: "improved release reliability by adding health checks, rollback scripts, and deployment gates"
+    status: supported
+    source:
+      file: source_resume.md
+      evidence: "improved release reliability by adding health checks, rollback scripts, and deployment gates"
+  - id: C012
+    artifact: cover_letter.md
+    text: "I owned AWS account baseline automation across 12 production and non-production accounts"
+    status: supported
+    source:
+      file: source_resume.md
+      evidence: "Owned AWS account baseline automation for 12 production and non-production accounts"
+  - id: C013
+    artifact: cover_letter.md
+    text: "using Terraform, GitHub Actions, and policy-as-code checks"
+    status: supported
+    source:
+      file: source_resume.md
+      evidence: "using Terraform, GitHub Actions, and policy-as-code checks"
+  - id: C014
+    artifact: cover_letter.md
+    text: "A self-service deployment path I built reduced average service onboarding from 3 days to 4 hours"
+    status: supported
+    source:
+      file: source_resume.md
+      evidence: "reduced average service onboarding from 3 days to 4 hours"
+  - id: C015
+    artifact: cover_letter.md
+    text: "I have supported on-call rotations, contributed to blameless postmortems, and led incident response improvements"
+    status: supported
+    source:
+      file: source_resume.md
+      evidence: "Supported on-call rotations for production web services and contributed to blameless postmortems"
+  - id: C016
+    artifact: cover_letter.md
+    text: "Earlier at Harbor Apps, I maintained Kubernetes clusters for customer-facing APIs"
+    status: supported
+    source:
+      file: source_resume.md
+      evidence: "Maintained Kubernetes clusters for customer-facing APIs"
+
+rejected_claims:
+  - id: R001
+    proposed_text: "Cut infrastructure costs by 35%"
+    status: rejected
+    reason: "No cost reduction metric appears in source_resume.md."
+    final_output: omitted
+  - id: R002
+    proposed_text: "Held the title Staff Platform Engineer"
+    status: rejected
+    reason: "The source resume only lists Senior Platform Engineer and DevOps Engineer titles."
+    final_output: omitted
