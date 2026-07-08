@@ -12,6 +12,7 @@ from runtime.crewai.contracts import (
     ExecutiveDecision,
     GapAnalysis,
     TailoredDocuments,
+    coerce_bool,
     coerce_text,
     recommendation_for_fit_score,
 )
@@ -126,3 +127,68 @@ class TestRecommendation:
         assert decision.fit_score == 72.0
         assert decision.recommendation == "PROCEED"
         assert decision.rationale == "solid"
+
+    def test_zero_to_one_scale_is_rescaled(self):
+        # A 0-1 fraction must not be read as a ~0 percentage -> PASS.
+        assert ExecutiveDecision.from_raw({"decision": {"fit_score": "0.85"}}).fit_score == 85.0
+        assert ExecutiveDecision.from_raw({"decision": {"fit_score": 0.5}}).recommendation == (
+            "PROCEED_WITH_CAUTION"
+        )
+
+    def test_score_clamped(self):
+        assert ExecutiveDecision.from_raw({"decision": {"fit_score": 150}}).fit_score == 100.0
+
+
+# --- Regression tests for adversarial-review findings ---------------------------
+
+
+class TestCoerceBool:
+    @pytest.mark.parametrize("value", [True, 1, "true", "yes", "approved", "PASS"])
+    def test_truthy(self, value):
+        assert coerce_bool(value) is True
+
+    @pytest.mark.parametrize("value", [False, 0, "false", "no", "rejected", ""])
+    def test_falsy(self, value):
+        assert coerce_bool(value) is False
+
+    def test_unknown_uses_default(self):
+        assert coerce_bool("maybe") is False
+        assert coerce_bool("maybe", default=True) is True
+
+
+class TestAuditVerdictRobustness:
+    def test_bool_approval_not_discarded(self):
+        # approval given as a bare bool must be honored, not dropped.
+        assert AuditVerdict.from_raw({"audit_report": {"approval": True}}).approved is True
+
+    def test_string_rejection_not_inverted(self):
+        # bool("false") is True in Python; a string rejection must stay rejected.
+        assert AuditVerdict.from_raw({"approved": "false"}).approved is False
+        assert AuditVerdict.from_raw({"approved": "no"}).approved is False
+
+    def test_status_style_verdict(self):
+        assert (
+            AuditVerdict.from_raw({"audit_report": {"final_status": "APPROVED"}}).approved is True
+        )
+        assert AuditVerdict.from_raw({"final_status": "REJECTED"}).approved is False
+
+
+class TestATSResultDoesNotPromoteOriginalResume:
+    def test_bare_resume_key_is_ignored(self):
+        # When ATS omits its report, a top-level `resume` (the ORIGINAL input) must
+        # NOT become the optimized output.
+        raw = {"optimization": {"done": True}, "resume": "ORIGINAL INPUT RESUME"}
+        assert ATSResult.from_raw(raw).optimized_resume == ""
+
+    def test_percent_score_parsed(self):
+        assert ATSResult.from_raw({"ats_report": {"ats_score": "92%"}}).ats_score == 92.0
+
+
+class TestTailoredDocumentsFallthrough:
+    def test_empty_nested_falls_back_to_flat(self):
+        raw = {"tailored_output": {"notes": "x"}, "tailored_resume": "R"}
+        assert TailoredDocuments.from_raw(raw).resume == "R"
+
+    def test_list_of_sections_joined(self):
+        raw = {"tailored_output": {"resume": ["# Alex", "Engineer"]}}
+        assert TailoredDocuments.from_raw(raw).resume == "# Alex\nEngineer"

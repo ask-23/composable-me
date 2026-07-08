@@ -48,6 +48,23 @@ def generate_run_id(now: Optional[datetime] = None) -> str:
     return f"{stamp}-{uuid.uuid4().hex[:8]}"
 
 
+def _sanitize_warning(message: Any) -> str:
+    """Strip any raw agent output from an error message before it enters the manifest.
+
+    Validation errors embed a slice of the model's raw output (e.g. after
+    "Output was:"), which for the tailoring agent is the résumé itself. The manifest
+    is PII-free by contract, so keep only the first line up to that marker.
+    """
+    text = str(message)
+    for marker in ("Output was:", "\n\nOutput was", "Output was\n"):
+        idx = text.find(marker)
+        if idx != -1:
+            text = text[:idx]
+            break
+    first_line = text.strip().splitlines()[0] if text.strip() else ""
+    return first_line[:200]
+
+
 def build_manifest(run_id: str, result: Any, inputs: Optional[RunInputs] = None) -> dict:
     """Assemble the JSON-serializable run manifest from a WorkflowResult."""
     audit_report = getattr(result, "audit_report", None) or {}
@@ -60,9 +77,9 @@ def build_manifest(run_id: str, result: Any, inputs: Optional[RunInputs] = None)
     audit_error = getattr(result, "audit_error", None)
     error_message = getattr(result, "error_message", None)
     if audit_error:
-        warnings.append(audit_error)
+        warnings.append(_sanitize_warning(audit_error))
     if error_message:
-        warnings.append(error_message)
+        warnings.append(_sanitize_warning(error_message))
 
     manifest = {
         "run_id": run_id,

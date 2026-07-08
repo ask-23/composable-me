@@ -16,17 +16,23 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+_TRUTHY = {"true", "yes", "y", "approved", "approve", "pass", "passed", "ok", "1"}
+_FALSY = {"false", "no", "n", "rejected", "reject", "fail", "failed", "0", ""}
+
 
 def coerce_text(value: Any) -> str:
     """Coerce a document-ish value to plain text.
 
-    Agents variously return a string, or a dict like ``{"content": "..."}`` /
-    ``{"text": "..."}`` / ``{"markdown": "..."}``. Anything else becomes "".
+    Agents variously return a string, a dict like ``{"content": "..."}`` /
+    ``{"text": "..."}`` / ``{"markdown": "..."}``, or a list of sections/lines
+    (joined with newlines). Anything else becomes "".
     """
     if value is None:
         return ""
     if isinstance(value, str):
         return value
+    if isinstance(value, list):
+        return "\n".join(coerce_text(v) for v in value if coerce_text(v))
     if isinstance(value, dict):
         for key in ("content", "text", "markdown", "body"):
             inner = value.get(key)
@@ -36,8 +42,28 @@ def coerce_text(value: Any) -> str:
     return str(value)
 
 
+def coerce_bool(value: Any, default: bool = False) -> bool:
+    """Coerce an approval-ish value to a bool, treating strings by meaning.
+
+    ``bool("false")`` is ``True`` in Python, so a model that returns a *string*
+    "false"/"no"/"rejected" must be parsed by content, not truthiness. Unknown
+    shapes fall back to ``default`` (rejection, for the audit gate).
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        token = value.strip().lower()
+        if token in _TRUTHY:
+            return True
+        if token in _FALSY:
+            return False
+    return default
+
+
 def _first_dict(raw: Any, *keys: str) -> dict:
-    """Return the first value among ``keys`` that is a dict, else ``{}``."""
+    """Return the first value among ``keys`` that is a dict, else the raw dict."""
     if not isinstance(raw, dict):
         return {}
     for key in keys:
@@ -57,17 +83,19 @@ class TailoredDocuments(BaseModel):
     def from_raw(cls, raw: Any) -> "TailoredDocuments":
         if not isinstance(raw, dict):
             return cls()
+        resume = cover = ""
         # Preferred nested shape: {"tailored_output": {"resume": {"content": ...}}}
         output = raw.get("tailored_output")
         if isinstance(output, dict):
-            return cls(
-                resume=coerce_text(output.get("resume")),
-                cover_letter=coerce_text(output.get("cover_letter")),
-            )
-        # Flat fallbacks used by some models / older fixtures.
-        resume = raw.get("tailored_resume", raw.get("resume"))
-        cover = raw.get("tailored_cover_letter", raw.get("cover_letter"))
-        return cls(resume=coerce_text(resume), cover_letter=coerce_text(cover))
+            resume = coerce_text(output.get("resume"))
+            cover = coerce_text(output.get("cover_letter"))
+        # Flat fallbacks (also used when the nested shape is present but empty, e.g.
+        # documents nested one level deeper than expected).
+        if not resume:
+            resume = coerce_text(raw.get("tailored_resume", raw.get("resume")))
+        if not cover:
+            cover = coerce_text(raw.get("tailored_cover_letter", raw.get("cover_letter")))
+        return cls(resume=resume, cover_letter=cover)
 
 
 class ATSResult(BaseModel):
@@ -80,16 +108,14 @@ class ATSResult(BaseModel):
     @classmethod
     def from_raw(cls, raw: Any) -> "ATSResult":
         report = _first_dict(raw, "ats_report")
-        score = report.get("ats_score", report.get("score"))
-        try:
-            score = float(score) if score is not None else None
-        except (TypeError, ValueError):
-            score = None
+        raw_score = report.get("ats_score", report.get("score"))
+        score = _parse_score(raw_score) if raw_score is not None else None
+        # Only trust explicit optimized_* keys. Deliberately NOT falling back to a
+        # bare "resume" key: when the ATS agent omits its output, that key may be the
+        # ORIGINAL input résumé, which must never be promoted as the final document.
         return cls(
-            optimized_resume=coerce_text(report.get("optimized_resume", report.get("resume"))),
-            optimized_cover_letter=coerce_text(
-                report.get("optimized_cover_letter", report.get("cover_letter"))
-            ),
+            optimized_resume=coerce_text(report.get("optimized_resume")),
+            optimized_cover_letter=coerce_text(report.get("optimized_cover_letter")),
             ats_score=score,
         )
 
@@ -104,12 +130,26 @@ class AuditVerdict(BaseModel):
     def from_raw(cls, raw: Any) -> "AuditVerdict":
         if not isinstance(raw, dict):
             return cls()
-        # Accept nested (audit_report.approval) or flat (approval) shapes.
+        # Accept nested (audit_report.*) or flat shapes.
         report = raw.get("audit_report") if isinstance(raw.get("audit_report"), dict) else raw
-        approval = report.get("approval") if isinstance(report.get("approval"), dict) else {}
-        approved = approval.get("approved", report.get("approved", False))
-        reason = approval.get("reason", report.get("reason", ""))
-        return cls(approved=bool(approved), reason=coerce_text(reason))
+        approval = report.get("approval")
+
+        # `approval` may be a dict, a bool, or a string; `approved` may be at either
+        # level; some models express the verdict via `final_status`/`overall_status`.
+        if isinstance(approval, dict):
+            approved = coerce_bool(approval.get("approved"))
+            reason = coerce_text(approval.get("reason", report.get("reason", "")))
+        elif approval is not None:
+            approved = coerce_bool(approval)
+            reason = coerce_text(report.get("reason", ""))
+        elif "approved" in report:
+            approved = coerce_bool(report.get("approved"))
+            reason = coerce_text(report.get("reason", ""))
+        else:
+            status = report.get("final_status", report.get("overall_status"))
+            approved = coerce_bool(status) if status is not None else False
+            reason = coerce_text(report.get("reason", status or ""))
+        return cls(approved=approved, reason=reason)
 
 
 class GapAnalysis(BaseModel):
@@ -168,15 +208,26 @@ class ExecutiveDecision(BaseModel):
 
 
 def _parse_score(value: Any) -> float:
-    """Parse a fit score that may arrive as a number or a '85%'/'85' string."""
+    """Parse a fit score to a 0-100 float.
+
+    Accepts a number or a '85%'/'85' string. Models sometimes report fit on a 0-1
+    scale; a value in (0, 1] is treated as a fraction and scaled to 0-100 so the
+    deterministic gate doesn't read an 85% fit as 0.85 -> PASS. Result is clamped.
+    """
+    score: float
     if isinstance(value, (int, float)):
-        return float(value)
-    if isinstance(value, str):
+        score = float(value)
+    elif isinstance(value, str):
         try:
-            return float(value.strip().rstrip("%"))
+            score = float(value.strip().rstrip("%"))
         except ValueError:
             return 0.0
-    return 0.0
+    else:
+        return 0.0
+
+    if 0.0 < score <= 1.0:
+        score *= 100.0
+    return max(0.0, min(100.0, score))
 
 
 def recommendation_for_fit_score(fit_score: float) -> str:

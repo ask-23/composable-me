@@ -155,6 +155,7 @@ class HydraWorkflow:
         max_audit_retries: int = 2,
         use_per_agent_models: bool = True,
         interactive: bool = False,
+        auto_approve: bool = False,
     ):
         """
         Initialize the workflow with all agents
@@ -164,11 +165,15 @@ class HydraWorkflow:
             max_audit_retries: Maximum number of audit retry attempts
             use_per_agent_models: If True, use optimized models per agent
             interactive: If True, enables Human-in-the-Loop features
+            auto_approve: If True, proceed past the human gates without pausing
+                (used by the non-interactive CLI, which has no way to resume a pause).
+                The async web flow leaves this False so it can pause for real HITL.
         """
         self.fallback_llm = llm
         self.max_audit_retries = max_audit_retries
         self.use_per_agent_models = use_per_agent_models
         self.interactive = interactive
+        self.auto_approve = auto_approve
         self.logger = logging.getLogger(__name__)
 
         # Initialize agents with per-agent model assignments
@@ -244,6 +249,18 @@ class HydraWorkflow:
         self, agent: BaseHydraAgent, context: Dict[str, Any], stage_name: str
     ) -> Dict[str, Any]:
         """Execute agent with automatic fallback to secondary model on failure."""
+        # An agent constructed without a resolvable LLM (no provider key) must not
+        # silently run on CrewAI's default OpenAI model: use the fallback if we have
+        # one, otherwise fail loudly.
+        if agent.llm is None:
+            if self.fallback_llm is None:
+                raise ValueError(
+                    f"No LLM available for stage '{stage_name}': set a provider API key "
+                    "(see .env.example) or pass a fallback LLM."
+                )
+            agent.llm = self.fallback_llm
+            self.agent_models[stage_name] = getattr(self.fallback_llm, "model", "fallback")
+
         try:
             return agent.execute(context)
         except Exception as e:
@@ -431,13 +448,12 @@ class HydraWorkflow:
                 if not UserInteraction.ask_yes_no("Proceed with these findings?"):
                     self._log("User aborted after Gap Analysis")
                     raise Exception("User aborted workflow")
-            else:
-                # Web mode: Check for approval in context
-                if not context.get("gap_analysis_approved", False):
-                    span.set_attribute("stage.paused", True)
-                    raise WorkflowPaused(
-                        WorkflowState.GAP_ANALYSIS_REVIEW, "Waiting for Gap Analysis approval"
-                    )
+            elif not context.get("gap_analysis_approved", False) and not self.auto_approve:
+                # Async web mode: pause for real human approval.
+                span.set_attribute("stage.paused", True)
+                raise WorkflowPaused(
+                    WorkflowState.GAP_ANALYSIS_REVIEW, "Waiting for Gap Analysis approval"
+                )
 
         return result
 
@@ -476,16 +492,19 @@ class HydraWorkflow:
                 # Merge answers into result
                 result["interview_notes"] = answers
                 self._log("User completed interactive interview")
-            else:
-                # Web mode: Check for answers in context
-                if not context.get("interview_answers"):
-                    span.set_attribute("stage.paused", True)
-                    raise WorkflowPaused(
-                        WorkflowState.INTERROGATION_REVIEW, "Waiting for interview answers"
-                    )
-
-                # If answers provided, merge them
+            elif context.get("interview_answers"):
                 result["interview_notes"] = context["interview_answers"]
+            elif self.auto_approve:
+                # Non-interactive CLI: the interview is optional gap-filling; proceed
+                # with no additional answers rather than pausing with no way to resume.
+                self._log("Auto-approve: proceeding without interview answers")
+                result["interview_notes"] = []
+            else:
+                # Async web mode: pause for real human answers.
+                span.set_attribute("stage.paused", True)
+                raise WorkflowPaused(
+                    WorkflowState.INTERROGATION_REVIEW, "Waiting for interview answers"
+                )
 
         return result
 
@@ -659,7 +678,7 @@ class HydraWorkflow:
         self, context: Dict[str, Any], document: str, document_type: str
     ) -> Dict[str, Any]:
         """Audit a single document, retrying only on transient audit-call errors."""
-        attempts = self.max_audit_retries + 1
+        attempts = max(1, self.max_audit_retries + 1)  # always attempt at least once
         last_error: Optional[Exception] = None
         for attempt in range(attempts):
             try:

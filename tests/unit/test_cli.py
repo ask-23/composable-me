@@ -59,7 +59,7 @@ def test_cli_runs_workflow_and_writes_run_scoped_outputs(tmp_path, monkeypatch, 
     captured_context = {}
 
     class StubWorkflow:
-        def __init__(self, llm, max_audit_retries=2, interactive=False):
+        def __init__(self, llm, max_audit_retries=2, interactive=False, auto_approve=False):
             self.llm = llm
             self.max_audit_retries = max_audit_retries
 
@@ -125,7 +125,7 @@ def test_cli_audit_rejected_returns_partial_exit_code(tmp_path, monkeypatch, cap
     (sources_dir / "s.txt").write_text("Source")
 
     class StubWorkflow:
-        def __init__(self, llm, max_audit_retries=2, interactive=False):
+        def __init__(self, llm, max_audit_retries=2, interactive=False, auto_approve=False):
             pass
 
         def execute(self, context):

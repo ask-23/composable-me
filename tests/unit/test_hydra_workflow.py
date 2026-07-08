@@ -169,6 +169,37 @@ class TestHydraWorkflow:
         assert result.audit_report["final_status"] == "APPROVED"
         assert result.audit_failed is False
 
+    def test_auto_approve_completes_without_pausing(self, mock_llm, mock_agent_results):
+        """With auto_approve and no HITL answers, the run completes instead of pausing."""
+        with (
+            patch("runtime.crewai.hydra_workflow.GapAnalyzerAgent"),
+            patch("runtime.crewai.hydra_workflow.InterrogatorPrepperAgent"),
+            patch("runtime.crewai.hydra_workflow.DifferentiatorAgent"),
+            patch("runtime.crewai.hydra_workflow.TailoringAgent"),
+            patch("runtime.crewai.hydra_workflow.ATSOptimizerAgent"),
+            patch("runtime.crewai.hydra_workflow.AuditorSuiteAgent"),
+            patch("runtime.crewai.hydra_workflow.ExecutiveSynthesizerAgent"),
+        ):
+            workflow = HydraWorkflow(mock_llm, use_per_agent_models=False, auto_approve=True)
+
+        workflow.gap_analyzer.execute.return_value = mock_agent_results["gap_analysis"]
+        workflow.interrogator_prepper.execute.return_value = mock_agent_results["interrogation"]
+        workflow.differentiator.execute.return_value = mock_agent_results["differentiation"]
+        workflow.tailoring_agent.execute.return_value = mock_agent_results["tailoring"]
+        workflow.ats_optimizer.execute.return_value = mock_agent_results["ats_optimization"]
+        workflow.auditor_suite.execute.return_value = mock_agent_results["audit_approved"]
+
+        # No gap_analysis_approved, no interview_answers — would pause without auto_approve.
+        context = {
+            "job_description": "JD",
+            "resume": "Resume",
+            "source_documents": "Sources",
+        }
+        result = workflow.execute(context)
+
+        assert result.status == RunStatus.COMPLETED
+        assert result.state == WorkflowState.COMPLETED
+
     def test_execute_audit_rejected(self, workflow, sample_context, mock_agent_results):
         """A rejection is a valid verdict: documents are kept but flagged, with no retry."""
         workflow.gap_analyzer.execute.return_value = mock_agent_results["gap_analysis"]

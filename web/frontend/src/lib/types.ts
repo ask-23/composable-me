@@ -17,7 +17,7 @@ export type JobState =
   | 'completed'
   | 'failed';
 
-export type AuditStatus = 'APPROVED' | 'REJECTED' | 'AUDIT_CRASHED';
+export type AuditStatus = 'APPROVED' | 'REJECTED' | 'AUDIT_ERROR' | 'AUDIT_CRASHED';
 
 export interface CreateJobRequest {
   job_description: string;
@@ -179,96 +179,110 @@ export interface SSECompleteEvent {
 }
 
 // Stage metadata for UI display with agent info and fun facts
-export const STAGE_INFO: Record<JobState, {
-  label: string;
-  description: string;
-  agentName: string;
-  role: string;
-  funFact: string;
-}> = {
+export const STAGE_INFO: Record<
+  JobState,
+  {
+    label: string;
+    description: string;
+    agentName: string;
+    role: string;
+    funFact: string;
+  }
+> = {
   initialized: {
     label: 'Starting',
     description: 'Initializing workflow...',
     agentName: 'Hydra Orchestrator',
     role: 'Coordinates the multi-agent pipeline and manages state transitions.',
-    funFact: 'Named after the mythical Hydra - cut off one head and two grow back. Our system has 6 specialized heads working in harmony!'
+    funFact:
+      'Named after the mythical Hydra - cut off one head and two grow back. Our system has 6 specialized heads working in harmony!',
   },
   gap_analysis: {
     label: 'Gap Analysis',
     description: 'Mapping job requirements to your experience...',
     agentName: 'Gap Analyzer',
     role: 'Reads the job description and your resume to identify direct matches, adjacent skills, and gaps that need addressing.',
-    funFact: 'This agent reads between the lines - it knows that "Python expertise" and "Django experience" are related even when not explicitly stated!'
+    funFact:
+      'This agent reads between the lines - it knows that "Python expertise" and "Django experience" are related even when not explicitly stated!',
   },
   gap_analysis_review: {
     label: 'Review Gap Analysis',
     description: 'Waiting for your review of the gap analysis...',
     agentName: 'Gap Analyzer',
     role: 'The analysis is complete. Review the findings and approve to continue, or request revisions.',
-    funFact: 'Your input here shapes how the rest of the pipeline frames your experience!'
+    funFact: 'Your input here shapes how the rest of the pipeline frames your experience!',
   },
   interrogation: {
     label: 'Interview Prep',
     description: 'Generating STAR+ questions for identified gaps...',
     agentName: 'Interrogator-Prepper',
     role: 'Creates behavioral interview questions using the STAR+ method to help you prepare narratives for any skill gaps.',
-    funFact: 'STAR+ adds a "Takeaway" to the classic STAR method - because interviewers love candidates who reflect on their growth!'
+    funFact:
+      'STAR+ adds a "Takeaway" to the classic STAR method - because interviewers love candidates who reflect on their growth!',
   },
   interrogation_review: {
     label: 'Answer Questions',
     description: 'Please answer the interview questions to strengthen your application...',
     agentName: 'Interrogator-Prepper',
     role: 'Your answers will be used to add authentic details to your resume and cover letter.',
-    funFact: 'The best answers include specific numbers, dates, and outcomes - they make your stories memorable!'
+    funFact:
+      'The best answers include specific numbers, dates, and outcomes - they make your stories memorable!',
   },
   differentiation: {
     label: 'Differentiation',
     description: 'Finding what makes you uniquely valuable...',
     agentName: 'Differentiator',
     role: 'Analyzes your background to identify unique value propositions that set you apart from other candidates.',
-    funFact: 'This agent thinks like a hiring manager who\'s seen 500 resumes - it finds the angle that makes yours memorable!'
+    funFact:
+      "This agent thinks like a hiring manager who's seen 500 resumes - it finds the angle that makes yours memorable!",
   },
   tailoring: {
     label: 'Tailoring',
     description: 'Crafting your resume and cover letter...',
     agentName: 'Tailoring Agent',
     role: 'Creates customized resume and cover letter that highlight relevant experience and address the specific job requirements.',
-    funFact: 'Studies show tailored resumes are 3x more likely to get interviews than generic ones. This agent does that tailoring automatically!'
+    funFact:
+      'Studies show tailored resumes are 3x more likely to get interviews than generic ones. This agent does that tailoring automatically!',
   },
   ats_optimization: {
     label: 'ATS Optimization',
     description: 'Optimizing for automated screening systems...',
     agentName: 'ATS Optimizer',
     role: 'Ensures your documents pass Applicant Tracking Systems by optimizing keywords, formatting, and structure.',
-    funFact: '75% of resumes are rejected by ATS before a human ever sees them. This agent speaks fluent robot!'
+    funFact:
+      '75% of resumes are rejected by ATS before a human ever sees them. This agent speaks fluent robot!',
   },
   auditing: {
     label: 'Auditing',
     description: 'Verifying truth, tone, and compliance...',
     agentName: 'Auditor Suite',
     role: 'Runs 4 audits: Truth (verifies claims against your sources), Tone (removes AI patterns), ATS (keyword coverage), and Compliance (follows rules).',
-    funFact: 'This agent is the quality gatekeeper - it catches phrases like "leverage synergies" and replaces them with human language!'
+    funFact:
+      'This agent is the quality gatekeeper - it catches phrases like "leverage synergies" and replaces them with human language!',
   },
   executive_synthesis: {
     label: 'Executive Brief',
     description: 'Creating strategic summary and recommendations...',
     agentName: 'Executive Synthesizer',
     role: 'Creates a strategic brief summarizing fit analysis, key differentiators, and action items for your application.',
-    funFact: 'This agent thinks like a hiring manager - it distills hours of analysis into a 2-minute read!'
+    funFact:
+      'This agent thinks like a hiring manager - it distills hours of analysis into a 2-minute read!',
   },
   completed: {
     label: 'Complete',
     description: 'Your application materials are ready!',
     agentName: 'Mission Accomplished',
     role: 'All agents have completed their work. Your tailored documents are ready for review.',
-    funFact: 'The average job application takes 30 minutes to customize. Hydra just did it in under 2 minutes!'
+    funFact:
+      'The average job application takes 30 minutes to customize. Hydra just did it in under 2 minutes!',
   },
   failed: {
     label: 'Failed',
     description: 'An error occurred during processing.',
     agentName: 'Error Handler',
-    role: 'Something went wrong, but don\'t worry - your partial results may still be useful.',
-    funFact: 'Even failures teach us something. Check the debug tab for intermediate results that were saved!'
+    role: "Something went wrong, but don't worry - your partial results may still be useful.",
+    funFact:
+      'Even failures teach us something. Check the debug tab for intermediate results that were saved!',
   },
 };
 

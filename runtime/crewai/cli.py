@@ -192,7 +192,12 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     workflow = HydraWorkflow(
-        llm, max_audit_retries=args.max_audit_retries, interactive=args.interactive
+        llm,
+        max_audit_retries=args.max_audit_retries,
+        interactive=args.interactive,
+        # A non-interactive CLI run has no way to resume a pause, so it proceeds
+        # past the human gates automatically. `--interactive` uses the real prompts.
+        auto_approve=not args.interactive,
     )
 
     print("Starting Hydra workflow...\n")

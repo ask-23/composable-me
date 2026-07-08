@@ -80,3 +80,17 @@ def test_write_run_artifacts_two_runs_do_not_clobber(tmp_path):
 
     assert (tmp_path / "r1" / artifacts.RESUME_FILE).read_text() == "first"
     assert (tmp_path / "r2" / artifacts.RESUME_FILE).read_text() == "second"
+
+
+def test_manifest_warnings_strip_raw_output_pii():
+    # A validation error embeds raw agent output (résumé text) after "Output was:".
+    leaky = (
+        "Invalid JSON output: line 1\n\nOutput was:\n"
+        "{'name': 'Jane Candidate', 'phone': '555-0100', ...}"
+    )
+    result = _result(status=RunStatus.FAILED, error_message=leaky, audit_error=None)
+    manifest = build_manifest("rid", result)
+    serialized = str(manifest["warnings"])
+    assert "Jane Candidate" not in serialized
+    assert "555-0100" not in serialized
+    assert "Invalid JSON output" in serialized  # the summary line survives
