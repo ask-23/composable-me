@@ -1,6 +1,5 @@
 """CrewAI runtime for Composable Me Hydra."""
 
-from .crew import HydraCrew
 from .base_agent import BaseHydraAgent, ValidationError
 from .config import HydraConfig
 from .llm_client import (
@@ -30,7 +29,6 @@ from .models import (
 )
 
 __all__ = [
-    "HydraCrew",
     "BaseHydraAgent",
     "ValidationError",
     "HydraConfig",
