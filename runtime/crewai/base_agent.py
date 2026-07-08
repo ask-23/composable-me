@@ -86,30 +86,32 @@ class BaseHydraAgent(ABC):
 
         return prompt_file.read_text()
 
-    def _load_truth_rules(self) -> str:
-        """Load AGENTS.MD truth laws"""
+    def _load_first(self, candidates: List[str], default: str) -> str:
+        """Return the contents of the first existing candidate path, else default.
+
+        Filenames are matched case-insensitively so the canonical docs load on both
+        case-sensitive (Linux/CI) and case-insensitive (macOS) filesystems.
+        """
         project_root = self._get_project_root()
-        agents_file = project_root / "docs" / "AGENTS.MD"
+        for candidate in candidates:
+            path = project_root / candidate
+            if path.exists():
+                return path.read_text()
+            # Case-insensitive fallback within the candidate's directory.
+            parent = path.parent
+            if parent.exists():
+                for entry in parent.iterdir():
+                    if entry.is_file() and entry.name.lower() == path.name.lower():
+                        return entry.read_text()
+        return default
 
-        if agents_file.exists():
-            return agents_file.read_text()
-
-        # Fallback to root AGENTS.md if docs/ doesn't exist
-        agents_file = project_root / "AGENTS.md"
-        if agents_file.exists():
-            return agents_file.read_text()
-
-        return DEFAULT_TRUTH_RULES
+    def _load_truth_rules(self) -> str:
+        """Load the canonical truth rules (docs/AGENTS.MD), else a built-in default."""
+        return self._load_first(["docs/AGENTS.MD", "AGENTS.md"], DEFAULT_TRUTH_RULES)
 
     def _load_style_guide(self) -> str:
-        """Load STYLE_GUIDE.MD"""
-        project_root = self._get_project_root()
-        style_file = project_root / "docs" / "STYLE_GUIDE.MD"
-
-        if style_file.exists():
-            return style_file.read_text()
-
-        return DEFAULT_STYLE_GUIDE
+        """Load the canonical style guide (docs/STYLE_GUIDE.MD), else a built-in default."""
+        return self._load_first(["docs/STYLE_GUIDE.MD", "STYLE_GUIDE.md"], DEFAULT_STYLE_GUIDE)
 
     def create_agent(self) -> Agent:
         """Create CrewAI agent with prompt and rules"""
