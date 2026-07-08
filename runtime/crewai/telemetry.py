@@ -7,15 +7,16 @@ This module provides tracing capabilities for:
 - Workflow stages
 """
 
-import os
 import logging
-from typing import Optional
+import os
 from contextlib import contextmanager
+from typing import Optional
 
 # Import from web backend's telemetry if available, otherwise use local implementation
 try:
     from opentelemetry import trace
-    from opentelemetry.trace import Status, StatusCode, Span
+    from opentelemetry.trace import Status, StatusCode
+
     OTEL_AVAILABLE = True
 except ImportError:
     OTEL_AVAILABLE = False

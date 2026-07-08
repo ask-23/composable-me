@@ -38,6 +38,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["B011", "F811"]
+# E402: tests may set up sys.path before importing the package under test.
+"tests/**" = ["B011", "F811", "E402"]
 
 # Test configuration lives in pytest.ini (source of truth).
