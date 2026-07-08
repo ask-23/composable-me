@@ -29,6 +29,7 @@ MANIFEST
 
 # Virtual Environment
 .venv/
+.venv13/
 venv/
 ENV/
 env/
@@ -51,6 +52,7 @@ htmlcov/
 
 # Output
 output/
+web/out/
 *.log
 
 # Environment variables
@@ -67,6 +69,7 @@ output/
 
 # OS
 .DS_Store
+**/.DS_Store
 Thumbs.db
 
 # Temporary files
@@ -93,19 +96,16 @@ playwright-report/
 playwright/.cache/
 
 # PII and sensitive files
+# NOTE: docs/ is tracked project documentation. User-supplied résumés / job
+# descriptions and generated run outputs are ignored below by content pattern.
 .kiro/
 .husky/
-docs/
 scripts/
-package-lock.json
-web/frontend/package-lock.json
 hydra_job*_*.md
 hydra_job*_*.csv
 hydra_job*_*.json
 datagrip-*.xml
 .junie/
-docs/*superprompt*.md
-docs/*prompt*.md
 *resume*
 *Resume*
 *_jd*
