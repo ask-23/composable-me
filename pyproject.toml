@@ -1,0 +1,43 @@
+[project]
+name = "composable-me"
+version = "0.1.0"
+description = "Composable Me (Hydra) — a multi-agent application that generates truthful, audit-backed job-application materials."
+requires-python = ">=3.11"
+readme = "README.md"
+license = { text = "MIT" }
+
+# This project is run as a set of modules (python -m runtime.crewai.cli), not
+# installed as a package. pyproject.toml exists to centralize tooling config.
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+# Lint scope is the Python application core (runtime/ + tests/). The web backend
+# is a separate subsystem whose tests require Postgres and is not covered by this
+# refactor; the Astro/Svelte frontend and the orphaned Go trees are out of scope.
+extend-exclude = [
+    ".venv",
+    ".venv13",
+    "web",
+    "runtime/go",
+    "cli",
+    "htmlcov",
+]
+
+[tool.ruff.lint]
+# Conservative, high-signal rule set focused on correctness and consistency.
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes (undefined names, unused imports)
+    "I",   # import sorting
+    "B",   # flake8-bugbear (likely bugs)
+]
+ignore = [
+    "E501",  # line length handled by editors, not enforced hard
+    "B008",  # function call in argument defaults (common in CLIs/frameworks)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B011", "F811"]
+
+# Test configuration lives in pytest.ini (source of truth).
