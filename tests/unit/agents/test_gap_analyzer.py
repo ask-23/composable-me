@@ -1,7 +1,10 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
 from runtime.crewai.agents.gap_analyzer import GapAnalyzerAgent
 from runtime.crewai.base_agent import ValidationError
+
 
 class TestGapAnalyzerAgent:
     

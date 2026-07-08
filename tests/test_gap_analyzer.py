@@ -5,10 +5,9 @@ Tests requirement extraction, classification accuracy, blocker detection,
 evidence tracking, and truth law compliance.
 """
 
+from unittest.mock import patch
+
 import pytest
-import json
-from unittest.mock import Mock, patch, MagicMock
-from crewai import LLM
 
 from runtime.crewai.agents.gap_analyzer import GapAnalyzerAgent
 from runtime.crewai.base_agent import ValidationError

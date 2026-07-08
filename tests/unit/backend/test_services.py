@@ -1,12 +1,13 @@
-import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
-from datetime import datetime
 import asyncio
+from datetime import datetime
+from unittest.mock import patch
 
-from web.backend.services.job_queue import JobQueue, Job
-from web.backend.services.workflow_runner import run_workflow_async, _map_workflow_state
+import pytest
+
+from runtime.crewai.hydra_workflow import WorkflowState
 from web.backend.models import JobState
-from runtime.crewai.hydra_workflow import WorkflowState, WorkflowResult
+from web.backend.services.job_queue import Job, JobQueue
+from web.backend.services.workflow_runner import _map_workflow_state, run_workflow_async
 
 # --- JobQueue Tests ---
 

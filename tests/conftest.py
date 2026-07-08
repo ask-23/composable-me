@@ -1,7 +1,10 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 from litestar.testing import TestClient
+
 from web.backend.app import app
+
 
 @pytest.fixture
 def test_client():

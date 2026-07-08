@@ -2,8 +2,10 @@
 Unit tests for Auditor Suite Agent
 """
 
+from unittest.mock import Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+
 from runtime.crewai.agents.auditor import AuditorSuiteAgent, ValidationError
 
 

@@ -1,10 +1,10 @@
 """Test SSE pause semantics - when workflow pauses, no 'complete' event should be emitted."""
 
-import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
-from datetime import datetime
+from unittest.mock import MagicMock, patch
 
-from runtime.crewai.hydra_workflow import WorkflowState, WorkflowResult
+import pytest
+
+from runtime.crewai.hydra_workflow import WorkflowResult, WorkflowState
 
 
 async def _drain_job_events(job) -> list[dict]:

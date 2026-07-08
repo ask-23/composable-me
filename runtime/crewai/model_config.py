@@ -11,9 +11,9 @@ Design Principles:
 """
 
 import os
-from typing import Dict, Any, Optional
-from crewai import LLM
+from typing import Any, Dict
 
+from crewai import LLM
 
 AGENT_MODELS: Dict[str, Dict[str, Any]] = {
     # ═══════════════════════════════════════════════════════════════════════

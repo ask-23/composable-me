@@ -2,8 +2,10 @@
 Unit tests for ATS Optimizer Agent
 """
 
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+
 from runtime.crewai.agents.ats_optimizer import ATSOptimizerAgent, ValidationError
 
 

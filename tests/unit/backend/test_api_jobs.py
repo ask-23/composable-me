@@ -1,7 +1,9 @@
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 from web.backend.models import JobState
 from web.backend.services.job_queue import job_queue
+
 
 def test_create_job_success(test_client, mock_workflow_runner):
     """Test successful job creation"""

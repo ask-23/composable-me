@@ -8,10 +8,11 @@ positioning, gap mitigation strategies, and action items.
 Model: Claude Sonnet 4 (or fallback to Llama 3.3)
 """
 
-from typing import Dict, Any
-from runtime.crewai.base_agent import BaseHydraAgent, ValidationError
+from typing import Any, Dict
+
 from crewai import LLM
 
+from runtime.crewai.base_agent import BaseHydraAgent, ValidationError
 
 # Decision thresholds
 DECISION_THRESHOLDS = {

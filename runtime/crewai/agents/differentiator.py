@@ -6,9 +6,11 @@ from other qualified applicants. It analyzes skill combinations, outcome stories
 narrative threads, and cultural fit signals.
 """
 
-from typing import Dict, Any, List
-from runtime.crewai.base_agent import BaseHydraAgent, ValidationError
+from typing import Any, Dict
+
 from crewai import LLM
+
+from runtime.crewai.base_agent import BaseHydraAgent, ValidationError
 
 
 class DifferentiatorAgent(BaseHydraAgent):

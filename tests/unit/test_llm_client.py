@@ -4,16 +4,17 @@ Unit tests for LLM client integration.
 Tests LLM client initialization, configuration, and error handling.
 """
 
-import pytest
 import os
 from unittest.mock import Mock, patch
 
+import pytest
+
 from runtime.crewai.llm_client import (
-    get_llm_client,
-    validate_model_name,
-    get_available_models,
     LLMClientError,
     LLMRetryHandler,
+    get_available_models,
+    get_llm_client,
+    validate_model_name,
 )
 
 

@@ -15,7 +15,7 @@ from typing import Iterable
 import yaml
 
 from runtime.crewai.hydra_workflow import HydraWorkflow
-from runtime.crewai.llm_client import get_llm_client, LLMClientError
+from runtime.crewai.llm_client import LLMClientError, get_llm_client
 
 
 def _get_repo_root() -> Path:
@@ -242,7 +242,7 @@ def main(argv: list[str] | None = None) -> int:
             elif final_status == "REJECTED":
                 print(f"⚠️  Documents generated but audit rejected: {audit_error}")
                 print(f"   Documents saved to {out_dir} - MANUAL REVIEW REQUIRED")
-                print(f"   Check audit_report.yaml for rejection details")
+                print("   Check audit_report.yaml for rejection details")
             else:
                 print(f"⚠️  Documents generated with audit status: {final_status}")
                 print(f"   Outputs saved to {out_dir}")

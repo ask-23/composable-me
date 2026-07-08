@@ -4,10 +4,9 @@ Unit tests for Differentiator Agent.
 Tests unique value identification, relevance scoring, and source material traceability.
 """
 
+from unittest.mock import patch
+
 import pytest
-import json
-from unittest.mock import Mock, patch, MagicMock
-from crewai import LLM
 
 from runtime.crewai.agents.differentiator import DifferentiatorAgent
 from runtime.crewai.base_agent import ValidationError

@@ -4,9 +4,10 @@ Unit tests for configuration management.
 Tests configuration loading from environment and validation.
 """
 
-import pytest
 import os
 from unittest.mock import patch
+
+import pytest
 
 from runtime.crewai.config import HydraConfig
 
