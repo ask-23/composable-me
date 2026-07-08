@@ -2,7 +2,6 @@
 
 from . import cli
 from .base_agent import BaseHydraAgent, ValidationError
-from .config import HydraConfig
 from .contracts import (
     ATSResult,
     AuditVerdict,
@@ -23,7 +22,6 @@ from .llm_client import (
 __all__ = [
     "BaseHydraAgent",
     "ValidationError",
-    "HydraConfig",
     "get_llm_client",
     "test_llm_connection",
     "get_available_models",
