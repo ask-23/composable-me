@@ -45,15 +45,15 @@ run.sh
 
 ## 3. Agent map (production roster — `HydraWorkflow`)
 
-| Agent | Prompt | Role | Decision type | Downstream |
-|---|---|---|---|---|
-| Gap Analyzer | `agents/gap-analyzer/` | Classify each JD requirement vs experience | model | Interrogator, Differentiator, Tailoring, Exec |
-| Interrogator-Prepper | `agents/interrogator-prepper/` | Generate interview questions to fill gaps | model + HITL | Differentiator, Tailoring |
-| Differentiator | `agents/differentiator/` | Identify unique value propositions | model | Tailoring, Exec |
-| Tailoring | `agents/tailoring-agent/` | Generate tailored résumé + cover letter | model | ATS, Audit, Exec |
-| ATS Optimizer | `agents/ats-optimizer/` | Keyword/format optimization | model | Audit |
-| Auditor Suite | `agents/auditor-suite/` | Truth/tone/ATS/compliance quality gate | model gate | (gate) |
-| Executive Synthesizer | *(inline, no prompt.md)* | Strategic brief + proceed/pass decision | model→**now deterministic gate** | (final) |
+| Agent                 | Prompt                         | Role                                       | Decision type                    | Downstream                                    |
+| --------------------- | ------------------------------ | ------------------------------------------ | -------------------------------- | --------------------------------------------- |
+| Gap Analyzer          | `agents/gap-analyzer/`         | Classify each JD requirement vs experience | model                            | Interrogator, Differentiator, Tailoring, Exec |
+| Interrogator-Prepper  | `agents/interrogator-prepper/` | Generate interview questions to fill gaps  | model + HITL                     | Differentiator, Tailoring                     |
+| Differentiator        | `agents/differentiator/`       | Identify unique value propositions         | model                            | Tailoring, Exec                               |
+| Tailoring             | `agents/tailoring-agent/`      | Generate tailored résumé + cover letter    | model                            | ATS, Audit, Exec                              |
+| ATS Optimizer         | `agents/ats-optimizer/`        | Keyword/format optimization                | model                            | Audit                                         |
+| Auditor Suite         | `agents/auditor-suite/`        | Truth/tone/ATS/compliance quality gate     | model gate                       | (gate)                                        |
+| Executive Synthesizer | _(inline, no prompt.md)_       | Strategic brief + proceed/pass decision    | model→**now deterministic gate** | (final)                                       |
 
 Not in production (removed in this refactor): **Commander** — existed only in the legacy
 `crew.py` and its test; never wired into `HydraWorkflow`. Its deterministic scoring methods were
@@ -67,6 +67,7 @@ exit codes. **Model-driven:** every stage's substance (classification, question 
 document text, ATS keywords, audit verdict, fit rationale).
 
 The boundary was blurred in three ways this refactor sharpens:
+
 1. The executive **recommendation** was left to the model even though a threshold table
    (`DECISION_THRESHOLDS`) existed unused — now Python derives `recommendation` from `fit_score`.
 2. The audit "retry loop" looked deterministic but its only mutation (`_apply_audit_fixes`) was a
@@ -124,4 +125,42 @@ prompts-as-source, run-scoped artifacts + manifest, test consolidation, document
 - **Normalize at the deterministic boundary** (Python-side contract coercion) rather than relying
   on provider-specific structured-output modes.
 - **Preserve the non-fatal-audit philosophy** but remove the pretend retry.
-- _(Further decisions appended below as implemented.)_
+
+### Implemented (this PR)
+
+- **Hygiene/CI:** fixed `.gitignore` (it blanket-ignored `docs/`, blocking
+  documentation); dropped unused `langchain`/`langchain-openai`; added `ruff` +
+  `pyproject.toml` + first CI (`.github/workflows/ci.yml`); committed the frontend
+  lockfile for reproducible installs.
+- **DB-at-import fix:** `web/backend/services/job_queue.py` no longer connects to
+  Postgres at import (migrations already run on app startup). This decoupled the entire
+  test suite from a live database.
+- **Spine collapse:** deleted the two dead/legacy CrewAI lineages (`quick_crew.py`,
+  `crew.py`) and the unused **Commander** agent; removed orphaned Go trees.
+  `HydraWorkflow` is the single spine.
+- **Typed contracts** (`contracts.py`) replaced the nested-dict probing; **fixed the
+  executive-synthesis bug** (it read `tailored_resume`, never set, so it always got
+  empty documents) and a **second latent bug** where the exec agent's inline prompt was
+  assigned to an unused attribute and never reached the model.
+- **Honest audit:** removed the no-op `_apply_audit_fixes` retry loop; audit runs once,
+  is non-fatal, and retries only on transient errors.
+- **Explicit status:** `RunStatus` drives CLI exit codes; deterministic
+  `fit_score → recommendation` gate.
+- **Provider config:** single `resolve_api_key`/`PROVIDER_ENV_KEYS`; removed orphaned
+  `config.py`; fixed stale env list and comment drift.
+- **Prompts as source:** created canonical `docs/AGENTS.MD` + `docs/STYLE_GUIDE.MD`
+  (the injection path previously fell back to stubs); case-tolerant loader; de-duplicated
+  the banned-phrase list; extracted the exec prompt into the prompt tree.
+- **Observability:** run-scoped `output/<run_id>/` + a PII-free `run.json` manifest.
+- **Tests:** consolidated duplicate suites into `tests/unit/`; added contract,
+  artifacts, model-config, and CLI coverage. Runtime suite: **166 passed / 2 skipped**,
+  **82%** line coverage on `runtime/crewai`, `ruff` clean.
+
+### Deferred (documented, not done)
+
+- Genericizing candidate-archetype examples and converting YAML-shaped output examples
+  to JSON inside a few prompts (see `docs/content-and-prompts.md`). The JSON contract is
+  already enforced at the task layer.
+- Wiring the web backend's Postgres integration tests into CI (they need a live DB).
+- Dropping CrewAI in favor of direct LLM calls (the framework is used as a thin shim by
+  the live spine) — a larger, out-of-scope change.

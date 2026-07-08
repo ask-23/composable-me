@@ -2,7 +2,15 @@
 
 **Generate job applications that tell the truth.**
 
-Composable Me is a multi-agent system that creates tailored résumés and cover letters from your real experience—without fabricating skills, inflating metrics, or distorting timelines.
+Composable Me is a multi-agent AI application that turns your real experience into a
+tailored résumé and cover letter — without fabricating skills, inflating metrics, or
+bending timelines. Every claim is checked against your source documents, and every run
+leaves an inspectable audit trail.
+
+It is also a working example of a design point: **deterministic software owns the
+workflow; model reasoning operates inside it.** Agents interpret, write, and judge;
+Python owns routing, validation, the pass/fail gate, artifact naming, and the final
+decision. That boundary is the interesting part, and this repo keeps it explicit.
 
 ![Composable Me Web Interface](docs/assets/composable-me-screenshot.webp)
 
@@ -11,82 +19,94 @@ Composable Me is a multi-agent system that creates tailored résumés and cover 
 ```bash
 git clone https://github.com/ask-23/composable-me.git
 cd composable-me
-cp .env.example .env   # Add your LLM API key
-./run.sh --jd your_job_description.md --resume your_resume.md --out output/
+cp .env.example .env          # add at least one LLM API key
+./run.sh --jd your_jd.md --resume your_resume.md --out output/
 ```
 
-That's it. Your tailored application materials will be in `output/`.
+Your materials land in a run-scoped directory: `output/<run_id>/`.
 
-## Why This Exists
+## Why this exists
 
-Most AI résumé tools optimize for *plausibility*. Composable Me optimizes for **truth under scrutiny**.
+Most AI résumé tools optimize for _plausibility_. Composable Me optimizes for **truth
+under scrutiny**.
 
-| Other Tools | Composable Me |
-|-------------|---------------|
-| Invent impressive-sounding metrics | Only use metrics you provide |
-| Stretch timelines to fill gaps | Preserve your actual chronology |
-| Add trending keywords liberally | Add keywords only where truthful |
-| Hope you don't get caught | Generate an audit trail you can defend |
+| Other tools                        | Composable Me                       |
+| ---------------------------------- | ----------------------------------- |
+| Invent impressive-sounding metrics | Use only metrics you provide        |
+| Stretch timelines to fill gaps     | Preserve your actual chronology     |
+| Add trending keywords liberally    | Add keywords only where truthful    |
+| Hope you don't get caught          | Emit an audit report you can defend |
 
-If the system can't justify a claim, it won't produce it. That's a feature.
+If the system can't justify a claim, it won't ship it. The Auditor can reject output —
+that's a feature, not a bug. Truth rules are defined once in
+[`docs/AGENTS.MD`](docs/AGENTS.MD) and injected into every agent.
 
-## What It Does
+## How it works
+
+A fixed, deterministic pipeline invokes seven agents in order and passes typed data
+between them:
 
 ```
-┌─────────────┐
-│ Your Inputs │  Job description + résumé + source documents
-└──────┬──────┘
-       ▼
-┌──────────────────────────────────────────────────────┐
-│                    HYDRA AGENTS                       │
-├──────────────┬───────────────┬───────────────────────┤
-│ Gap Analyzer │ Differentiator│ Tailoring Agent       │
-│ Interrogator │ ATS Optimizer │ Auditor               │
-└──────────────┴───────────────┴───────────────────────┘
-       ▼
-┌─────────────┐
-│   Outputs   │  Résumé + cover letter + audit report
-└─────────────┘
+Inputs (JD + résumé + source docs)
+      │
+      ▼
+Gap Analysis ─▶ Interrogation ─▶ Differentiation ─▶ Tailoring
+                                                        │
+                                                        ▼
+                                          ATS Optimization ─▶ Audit (gate)
+                                                        │
+                                                        ▼
+                                          Executive Synthesis
+      │
+      ▼
+Artifacts: output/<run_id>/ {resume.md, cover_letter.md, audit_report.yaml,
+                             execution_log.txt, run.json}
 ```
 
-**Gap Analysis** — Maps job requirements to your experience, identifying matches and gaps
+### Agent map
 
-**Interview Prep** — Generates targeted questions to surface real details you may have forgotten
+| Agent                     | Job                                                    | Decision type                                  |
+| ------------------------- | ------------------------------------------------------ | ---------------------------------------------- |
+| **Gap Analyzer**          | Classify each JD requirement vs. your experience       | model                                          |
+| **Interrogator-Prepper**  | Ask questions to fill real gaps (human-in-the-loop)    | model + HITL                                   |
+| **Differentiator**        | Identify authentic value propositions                  | model                                          |
+| **Tailoring**             | Write the tailored résumé + cover letter               | model                                          |
+| **ATS Optimizer**         | Keyword/format optimization for ATS                    | model                                          |
+| **Auditor Suite**         | Verify truth, tone, ATS, compliance — the quality gate | model gate                                     |
+| **Executive Synthesizer** | Strategic brief + fit score                            | model (score) → deterministic (recommendation) |
 
-**Differentiation** — Identifies authentic value propositions that set you apart
+### Deterministic vs. model-driven
 
-**Tailoring** — Creates customized documents for the specific role
+| Owned by software (deterministic)              | Owned by the model                   |
+| ---------------------------------------------- | ------------------------------------ |
+| Stage ordering and resume/skip logic           | Requirement classification           |
+| Contract coercion at every stage boundary      | Question generation, differentiators |
+| Audit pass/fail gate                           | Résumé / cover-letter prose          |
+| `fit_score → recommendation` mapping           | The fit score itself, with rationale |
+| Artifact naming, run-scoped writes, exit codes | ATS keywording, audit verdicts       |
 
-**ATS Optimization** — Improves keyword coverage *without* changing meaning
+The model proposes; the surrounding software disposes. See
+[`docs/architecture.md`](docs/architecture.md) for the full control-flow map.
 
-**Audit & Verify** — Validates every claim against your source documents
+## Output artifacts
 
-## Output Files
+Each run writes to `output/<run_id>/`:
 
-| File | What It Contains |
-|------|------------------|
-| `resume.md` | Tailored résumé |
-| `cover_letter.md` | Tailored cover letter |
-| `audit_report.yaml` | Claim-by-claim verification |
-| `execution_log.txt` | Full agent trace |
+| File                | Contents                                                                                            |
+| ------------------- | --------------------------------------------------------------------------------------------------- |
+| `resume.md`         | Tailored résumé                                                                                     |
+| `cover_letter.md`   | Tailored cover letter                                                                               |
+| `audit_report.yaml` | Claim-by-claim verification and the final verdict                                                   |
+| `execution_log.txt` | Timestamped agent trace                                                                             |
+| `run.json`          | Run manifest: status, per-agent models, decision, artifact list — input _sizes_ only, never content |
+
+Because runs are scoped by id, consecutive runs never clobber each other, and
+`run.json` lets you understand a run without reading the whole log.
 
 ## Installation
 
-### Requirements
-
-- Python 3.11+ (3.13 recommended)
-- One LLM API key (see below)
-- Node.js 18+ (only for web interface)
-
-### Option 1: Use the Script (Recommended)
-
-```bash
-./run.sh --help
-```
-
-The script handles virtual environments, dependencies, and execution.
-
-### Option 2: Manual Setup
+Requires **Python 3.11+** (3.13 recommended) and one LLM API key. Node 18+ only for the
+optional web UI.
 
 ```bash
 python3 -m venv .venv
@@ -95,111 +115,78 @@ pip install -r requirements.txt
 python -m runtime.crewai.cli --help
 ```
 
+`./run.sh` wraps venv creation, dependency install, and execution.
+
 ## Configuration
 
-### LLM Providers
+Set at least one provider key in `.env` (copy from `.env.example`). The CLI's fallback
+LLM uses the first available in order **Together → Chutes → OpenRouter**. Agents are
+additionally assigned per-task models (see
+[`runtime/crewai/model_config.py`](runtime/crewai/model_config.py)); provide the
+matching keys to use each agent's preferred model, or it degrades to a fallback.
 
-Set one of these in your `.env` file:
+| Provider     | Env var              | Used by                                          |
+| ------------ | -------------------- | ------------------------------------------------ |
+| Together AI  | `TOGETHER_API_KEY`   | ATS Optimizer, Interrogator, fallback            |
+| Chutes (TEE) | `CHUTES_API_KEY`     | Gap Analyzer                                     |
+| OpenRouter   | `OPENROUTER_API_KEY` | Anthropic-model fallback                         |
+| Anthropic    | `ANTHROPIC_API_KEY`  | Differentiator, Tailoring, Executive Synthesizer |
+| OpenAI       | `OPENAI_API_KEY`     | Auditor Suite                                    |
 
-| Provider | Link | Key Format |
-|----------|------|------------|
-| Together AI | https://together.ai | `TOGETHER_API_KEY=tgp_v1_...` |
-| Chutes | https://chutes.ai | `CHUTES_API_KEY=cpk_...` |
-| OpenRouter | https://openrouter.ai | `OPENROUTER_API_KEY=sk-or-...` |
+### Web interface (optional)
 
-The CLI uses the first available key.
+Astro + Svelte frontend over a Litestar API. See the frontend under `web/`. Requires
+Postgres for job persistence:
 
-### Web Interface (Optional)
-
-```bash
-# Start PostgreSQL
-docker run -d --name hydra-db \
-  -e POSTGRES_USER=hydra \
-  -e POSTGRES_PASSWORD=hydra \
-  -e POSTGRES_DB=hydra \
-  -p 5432:5432 postgres:16
-
-# Set database URL
-export HYDRA_DATABASE_URL=postgresql://hydra:hydra@localhost:5432/hydra
-
-# Run migrations
-PYTHONPATH="$(pwd)" python -m web.backend.db.migrate
-
-# Start backend (terminal 1)
-cd web/backend && ./run.sh
-
-# Start frontend (terminal 2)
-cd web/frontend && npm install && npm run dev
-```
-
-- Frontend: http://localhost:4321
-- Backend: http://localhost:8000
-
-## Project Structure
-
-```
-composable-me/
-├── runtime/crewai/   # Core orchestration engine
-├── agents/           # Agent prompt templates
-├── web/              # Optional web UI (Astro + Litestar)
-├── tests/            # pytest + Playwright tests
-├── examples/         # Template inputs (fill in with your details)
-└── run.sh            # CLI entry point
-```
-
-## Troubleshooting
-
-<details>
-<summary><strong>No API key found</strong></summary>
-
-Set at least one provider key in `.env`. See [Configuration](#configuration).
-</details>
-
-<details>
-<summary><strong>Document failed audit</strong></summary>
-
-This means the system refused to approve unverifiable claims. This is expected behavior—review the `audit_report.yaml` to see what couldn't be verified, then provide additional source documents.
-</details>
-
-<details>
-<summary><strong>Permission denied: run.sh</strong></summary>
-
-```bash
-chmod +x run.sh
-```
-</details>
-
-<details>
-<summary><strong>Database connection failed</strong></summary>
-
-Ensure PostgreSQL is running and `HYDRA_DATABASE_URL` is set:
 ```bash
 export HYDRA_DATABASE_URL=postgresql://hydra:hydra@localhost:5432/hydra
+./web/run.sh both      # backend :8000, frontend :4321
 ```
-</details>
 
-## Tech Stack
+## Development
 
-| Layer | Technology |
-|-------|------------|
-| Agent Framework | CrewAI 0.86+ |
-| LLM Abstraction | LiteLLM |
-| Runtime | Python 3.11+ |
-| Web Frontend | Astro 5 + Svelte 5 |
-| Web Backend | Litestar |
-| Database | PostgreSQL 16 |
-| Observability | OpenTelemetry |
-| Testing | pytest, Playwright |
+| Task                     | Command                                                           |
+| ------------------------ | ----------------------------------------------------------------- |
+| Install (with dev tools) | `pip install -r requirements-dev.txt`                             |
+| Lint                     | `ruff check .`                                                    |
+| Test (application core)  | `pytest tests/unit tests/integration --ignore=tests/unit/backend` |
+| Frontend typecheck       | `cd web/frontend && npm ci && npm run check`                      |
 
-## Design Philosophy
+CI runs lint + the core test suite and the frontend typecheck on every push
+(`.github/workflows/ci.yml`). The backend integration tests require a live Postgres and
+run separately.
 
-This project is intentionally constrained. Those constraints *are* the product.
+## Extending it
 
-1. **Truth is a hard boundary** — Every claim traces to source material
-2. **Chronology is immutable** — Dates and sequences are never altered
-3. **Failing is acceptable** — Silent degradation is a defect
-4. **Human-in-the-loop** — Automation stops where judgment begins
+- **A new agent**: add `agents/<name>/prompt.md`, a wrapper in
+  `runtime/crewai/agents/`, a `model_config.py` entry, and wire it into
+  `HydraWorkflow`. Give it a typed contract in `runtime/crewai/contracts.py` if
+  downstream stages consume its output.
+- **Prompt / voice changes**: see [`docs/content-and-prompts.md`](docs/content-and-prompts.md).
+  Truth rules and the banned-phrase list live in `docs/AGENTS.MD` and
+  `docs/STYLE_GUIDE.MD` and are injected automatically.
+
+## Tech stack
+
+| Layer           | Technology               |
+| --------------- | ------------------------ |
+| Agent framework | CrewAI + LiteLLM         |
+| Runtime         | Python 3.11+             |
+| Contracts       | Pydantic v2              |
+| Web frontend    | Astro 5 + Svelte 5       |
+| Web backend     | Litestar + PostgreSQL    |
+| Observability   | OpenTelemetry            |
+| Tests / lint    | pytest, ruff, Playwright |
+
+## Design philosophy
+
+This project is intentionally constrained. Those constraints _are_ the product.
+
+1. **Truth is a hard boundary** — every claim traces to source material.
+2. **Chronology is immutable** — dates and sequences are never altered.
+3. **Failing is acceptable** — a rejected audit beats a silent fabrication.
+4. **Software owns the frame** — agents reason inside deterministic rails.
 
 ## License
 
-MIT — Use responsibly. This system exists to amplify real experience, not invent it.
+MIT — use responsibly. This system exists to amplify real experience, not invent it.
