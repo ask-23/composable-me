@@ -18,11 +18,16 @@ from enum import Enum
 from typing import Any, Optional
 
 from web.backend.observability.pii import (
-    redact_pii as _central_redact_pii,
-    sanitize_dict as _central_sanitize_dict,
-    truncate_content as _central_truncate_content,
-    PII_PATTERNS,
     MAX_CONTENT_LENGTH,
+)
+from web.backend.observability.pii import (
+    redact_pii as _central_redact_pii,
+)
+from web.backend.observability.pii import (
+    sanitize_dict as _central_sanitize_dict,
+)
+from web.backend.observability.pii import (
+    truncate_content as _central_truncate_content,
 )
 
 

@@ -10,7 +10,6 @@ Single source of truth for PII patterns and redaction logic, used by:
 import re
 from typing import Any
 
-
 # --- PII Detection Patterns ---
 
 PII_PATTERNS: list[tuple[re.Pattern, str]] = [

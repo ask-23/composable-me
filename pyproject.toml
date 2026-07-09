@@ -12,13 +12,11 @@ license = { text = "MIT" }
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-# Lint scope is the Python application core (runtime/ + tests/). The web backend
-# is a separate subsystem whose tests require Postgres and is not covered by this
-# refactor; the Astro/Svelte frontend and the orphaned Go trees are out of scope.
+# Lint scope is the Python application core (runtime/ + tests/ + web/backend).
+# The Astro/Svelte frontend and the orphaned Go trees are out of scope.
 extend-exclude = [
     ".venv",
     ".venv13",
-    "web",
     "runtime/go",
     "cli",
     "htmlcov",
@@ -41,5 +39,8 @@ ignore = [
 # E402: tests may set up sys.path before importing the package under test.
 # F841: coverage tests frequently bind `result = call()` without asserting on it.
 "tests/**" = ["B011", "F811", "E402", "F841"]
+# E402: app.py deliberately calls load_dotenv() before importing modules that
+# read environment variables at import time (documented inline in the file).
+"web/backend/app.py" = ["E402"]
 
 # Test configuration lives in pytest.ini (source of truth).

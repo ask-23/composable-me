@@ -6,7 +6,6 @@ from pathlib import Path
 
 from web.backend.db.connection import get_conn
 
-
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
 

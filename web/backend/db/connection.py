@@ -9,7 +9,6 @@ from typing import Iterator
 import psycopg
 from psycopg.rows import dict_row
 
-
 DEFAULT_DATABASE_URL = "postgresql://hydra:hydra@localhost:5432/hydra"
 DATABASE_URL = os.environ.get("HYDRA_DATABASE_URL", os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL))
 

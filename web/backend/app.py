@@ -1,9 +1,7 @@
 """Litestar application for Hydra web API."""
 
 import logging
-import os
 from pathlib import Path
-from typing import Callable
 
 # Load environment variables from .env file BEFORE any other imports
 # This ensures API keys are available when workflow_runner imports llm_client
@@ -25,14 +23,14 @@ else:
 from litestar import Litestar
 from litestar.config.cors import CORSConfig
 from litestar.logging import LoggingConfig
-from litestar.middleware.base import DefineMiddleware, MiddlewareProtocol
+from litestar.middleware.base import MiddlewareProtocol
 from litestar.types import ASGIApp, Receive, Scope, Send
 
+from web.backend.db import apply_migrations
+from web.backend.observability.sentry import setup_sentry
 from web.backend.routes.health import HealthController
 from web.backend.routes.jobs import JobsController
-from web.backend.telemetry import init_telemetry, shutdown_telemetry, get_tracer, create_span
-from web.backend.observability.sentry import setup_sentry
-from web.backend.db import apply_migrations
+from web.backend.telemetry import get_tracer, init_telemetry, shutdown_telemetry
 
 # Configure logging
 logging_config = LoggingConfig(
