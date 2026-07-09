@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 
 class JobState(str, Enum):
     """Job execution states matching HydraWorkflow states."""
-
     INITIALIZED = "initialized"
     GAP_ANALYSIS = "gap_analysis"
     GAP_ANALYSIS_REVIEW = "gap_analysis_review"  # Paused
