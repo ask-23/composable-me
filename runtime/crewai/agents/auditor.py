@@ -5,32 +5,35 @@ This agent is the quality gate that verifies all outputs are truthful, sound hum
 comply with AGENTS.MD rules, will pass ATS systems, and match the JD appropriately.
 """
 
-from typing import Dict, Any, List
-from runtime.crewai.base_agent import BaseHydraAgent, ValidationError
+from typing import Any, Dict
+
 from crewai import LLM
-import re
+
+from runtime.crewai.base_agent import BaseHydraAgent, ValidationError
 
 
 class AuditorSuiteAgent(BaseHydraAgent):
     """Auditor Suite Agent that performs comprehensive verification of all outputs"""
-    
+
     role = "Auditor Suite"
     goal = "Verify all outputs are truthful, human-sounding, compliant, and ATS-ready"
-    expected_output = "JSON with comprehensive audit report including truth, tone, ATS, and compliance audits"
-    
+    expected_output = (
+        "JSON with comprehensive audit report including truth, tone, ATS, and compliance audits"
+    )
+
     def __init__(self, llm: LLM):
         """
         Initialize the Auditor Suite Agent
-        
+
         Args:
             llm: The LLM instance to use
         """
         super().__init__(llm, "agents/auditor-suite/prompt.md")
-    
+
     def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute the Auditor Suite agent to perform comprehensive verification
-        
+
         Args:
             context: Dictionary containing:
                 - document: The document to audit (resume, cover letter, etc.)
@@ -38,7 +41,7 @@ class AuditorSuiteAgent(BaseHydraAgent):
                 - job_description: The original job description
                 - source_documents: User source documents for truth verification
                 - target_role: The role being applied for
-            
+
         Returns:
             Dictionary with comprehensive audit report
         """
@@ -47,23 +50,23 @@ class AuditorSuiteAgent(BaseHydraAgent):
         for key in required_keys:
             if key not in context:
                 raise ValidationError(f"Missing required context key: {key}")
-        
+
         # Create task for the agent
         task_description = f"""
-        Perform comprehensive audit of the {context['document_type']} for the {context.get('target_role', 'target role')}.
+        Perform comprehensive audit of the {context["document_type"]} for the {context.get("target_role", "target role")}.
         
         Document to Audit:
-        {context['document']}
+        {context["document"]}
         
-        Document Type: {context['document_type']}
+        Document Type: {context["document_type"]}
         
         Job Description:
-        {context['job_description']}
+        {context["job_description"]}
         
         Source Documents (for truth verification):
-        {context['source_documents']}
+        {context["source_documents"]}
         
-        Target Role: {context.get('target_role', 'Not specified')}
+        Target Role: {context.get("target_role", "Not specified")}
         
         Perform all four audit components:
         1. Truth Audit - Verify every factual claim against sources
@@ -74,25 +77,17 @@ class AuditorSuiteAgent(BaseHydraAgent):
         Categorize issues as blocking, warning, or recommendation.
         Provide specific fixes for each issue found.
         """
-        
+
         # Execute with retry logic
         task = self.create_task(task_description)
         result = self.execute_with_retry(task)
-        
+
         # Validate the output
         self._validate_schema(result)
-        
+
         return result
-    
-    def _validate_context(self, context: Dict[str, Any]) -> None:
-        """Validate required context parameters"""
-        required = ["document", "document_type", "job_description", "source_documents"]
-        for param in required:
-            if param not in context:
-                raise ValidationError(f"Missing required context: {param}")
-    
+
     def _validate_schema(self, output: Dict[str, Any]) -> None:
         """Validate Auditor Suite specific output schema"""
-        super()._validate_schema(output)  # Validates base fields
-        # LLM output structure varies - accept whatever it produces
-        return
+        # LLM output structure varies - accept whatever it produces (base fields only).
+        super()._validate_schema(output)

@@ -14,17 +14,12 @@ from typing import Any, Optional
 
 from psycopg.types.json import Json
 
-from web.backend.db import apply_migrations, get_conn
+from web.backend.db import get_conn
 from web.backend.models import JobState
 
-
-def _init_db() -> None:
-    """Initialize the database schema if needed."""
-    apply_migrations()
-
-
-# Initialize DB on module load
-_init_db()
+# NOTE: schema migrations run at application startup (see web/backend/app.py
+# `on_startup`). Importing this module must not open a database connection —
+# doing so previously coupled every test and tooling import to a live Postgres.
 
 
 @dataclass
@@ -294,7 +289,9 @@ class JobQueue:
             if not job:
                 # Load from DB if not in cache
                 with get_conn() as conn:
-                    row = conn.execute("SELECT * FROM job_queue WHERE id = %s", (job_id,)).fetchone()
+                    row = conn.execute(
+                        "SELECT * FROM job_queue WHERE id = %s", (job_id,)
+                    ).fetchone()
                     if row:
                         job = _row_to_job(row)
                         self._active_jobs[job_id] = job

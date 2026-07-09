@@ -4,13 +4,11 @@ Unit tests for BaseHydraAgent.
 Tests JSON validation, prompt loading, and error handling.
 """
 
+from unittest.mock import Mock, patch
+
 import pytest
-import json
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
 
 from runtime.crewai.base_agent import BaseHydraAgent, ValidationError
-from crewai import LLM
 
 # Test constants
 DEFAULT_CONFIDENCE = 0.8

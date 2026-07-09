@@ -17,6 +17,22 @@ on:
       - '.taskmaster/**'
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Ruff (lint)
+        run: ruff check .
+
   unit-tests:
     runs-on: ubuntu-latest
     services:
@@ -117,7 +133,7 @@ jobs:
         run: npm run build
 
       # --- Data integrity checks ---
-      - name: "DC-1: No /job/ in E2E test navigation (must be /jobs/)"
+      - name: 'DC-1: No /job/ in E2E test navigation (must be /jobs/)'
         working-directory: ${{ github.workspace }}
         run: |
           if grep -rn 'goto.*\/job\/' web/frontend/tests/e2e/; then
@@ -126,7 +142,7 @@ jobs:
           fi
           echo "PASS: No /job/ references found in E2E tests"
 
-      - name: "DC-8: JobState enum sync (backend ↔ frontend)"
+      - name: 'DC-8: JobState enum sync (backend ↔ frontend)'
         working-directory: ${{ github.workspace }}
         run: |
           BACKEND=$(sed -n '/^class JobState/,/^$/p' web/backend/models.py \

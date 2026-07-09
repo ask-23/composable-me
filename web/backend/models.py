@@ -10,9 +10,9 @@ class JobState(str, Enum):
     """Job execution states matching HydraWorkflow states."""
     INITIALIZED = "initialized"
     GAP_ANALYSIS = "gap_analysis"
-    GAP_ANALYSIS_REVIEW = "gap_analysis_review" # Paused
+    GAP_ANALYSIS_REVIEW = "gap_analysis_review"  # Paused
     INTERROGATION = "interrogation"
-    INTERROGATION_REVIEW = "interrogation_review" # Paused
+    INTERROGATION_REVIEW = "interrogation_review"  # Paused
     DIFFERENTIATION = "differentiation"
     TAILORING = "tailoring"
     ATS_OPTIMIZATION = "ats_optimization"
@@ -24,13 +24,16 @@ class JobState(str, Enum):
 
 class AuditStatus(str, Enum):
     """Audit result status."""
+
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
-    AUDIT_CRASHED = "AUDIT_CRASHED"
+    AUDIT_ERROR = "AUDIT_ERROR"  # current name emitted by the workflow
+    AUDIT_CRASHED = "AUDIT_CRASHED"  # legacy alias, kept so historical rows still parse
 
 
 class CreateJobRequest(BaseModel):
     """Request to create a new job."""
+
     job_description: str = Field(..., min_length=10, description="Job description text")
     resume: str = Field(..., min_length=10, description="Resume text")
     source_documents: str = Field(default="", description="Supporting documents")
@@ -44,6 +47,7 @@ class CreateJobRequest(BaseModel):
 
 class CreateJobResponse(BaseModel):
     """Response after creating a job."""
+
     job_id: str
     status: str = "queued"
     created_at: datetime
@@ -51,22 +55,26 @@ class CreateJobResponse(BaseModel):
 
 class ApproveGapAnalysisRequest(BaseModel):
     """Request to approve gap analysis and resume workflow."""
+
     approved: bool = True
 
 
 class SubmitInterviewAnswersRequest(BaseModel):
     """Request to submit interview answers and resume workflow."""
+
     answers: list[dict[str, Any]] = Field(..., description="List of interview answers")
 
 
 class FinalDocuments(BaseModel):
     """Final generated documents."""
+
     resume: str = ""
     cover_letter: str = ""
 
 
 class AuditReport(BaseModel):
     """Audit report structure."""
+
     resume_audit: Optional[dict[str, Any]] = None
     cover_letter_audit: Optional[dict[str, Any]] = None
     final_status: Optional[AuditStatus] = None
@@ -77,6 +85,7 @@ class AuditReport(BaseModel):
 
 class JobResponse(BaseModel):
     """Full job status response."""
+
     job_id: str
     state: JobState
     success: bool
@@ -86,16 +95,21 @@ class JobResponse(BaseModel):
     completed_at: Optional[datetime] = None
     final_documents: Optional[FinalDocuments] = None
     audit_report: Optional[AuditReport] = None
-    executive_brief: Optional[dict[str, Any]] = Field(default=None, description="Strategic executive brief")
+    executive_brief: Optional[dict[str, Any]] = Field(
+        default=None, description="Strategic executive brief"
+    )
     intermediate_results: Optional[dict[str, Any]] = None
     execution_log: list[str] = Field(default_factory=list)
     error_message: Optional[str] = None
     audit_failed: bool = False
     audit_error: Optional[str] = None
-    agent_models: Optional[dict[str, str]] = Field(default=None, description="Models used by each agent")
+    agent_models: Optional[dict[str, str]] = Field(
+        default=None, description="Models used by each agent"
+    )
 
 
 class SSEEvent(BaseModel):
     """Server-Sent Event payload."""
+
     event: str
     data: dict[str, Any]

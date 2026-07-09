@@ -2,31 +2,40 @@
 Unit tests for HydraWorkflow
 """
 
+from unittest.mock import Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from runtime.crewai.hydra_workflow import HydraWorkflow, WorkflowState, WorkflowResult, ValidationError
+
+from runtime.crewai.hydra_workflow import (
+    HydraWorkflow,
+    RunStatus,
+    ValidationError,
+    WorkflowState,
+)
 
 
 class TestHydraWorkflow:
     """Test suite for HydraWorkflow"""
-    
+
     @pytest.fixture
     def mock_llm(self):
         """Create mock LLM for testing"""
         return Mock()
-    
+
     @pytest.fixture
     def workflow(self, mock_llm):
         """Create HydraWorkflow for testing"""
-        with patch('runtime.crewai.hydra_workflow.GapAnalyzerAgent'), \
-             patch('runtime.crewai.hydra_workflow.InterrogatorPrepperAgent'), \
-             patch('runtime.crewai.hydra_workflow.DifferentiatorAgent'), \
-             patch('runtime.crewai.hydra_workflow.TailoringAgent'), \
-             patch('runtime.crewai.hydra_workflow.ATSOptimizerAgent'), \
-             patch('runtime.crewai.hydra_workflow.AuditorSuiteAgent'), \
-             patch('runtime.crewai.hydra_workflow.ExecutiveSynthesizerAgent'):
+        with (
+            patch("runtime.crewai.hydra_workflow.GapAnalyzerAgent"),
+            patch("runtime.crewai.hydra_workflow.InterrogatorPrepperAgent"),
+            patch("runtime.crewai.hydra_workflow.DifferentiatorAgent"),
+            patch("runtime.crewai.hydra_workflow.TailoringAgent"),
+            patch("runtime.crewai.hydra_workflow.ATSOptimizerAgent"),
+            patch("runtime.crewai.hydra_workflow.AuditorSuiteAgent"),
+            patch("runtime.crewai.hydra_workflow.ExecutiveSynthesizerAgent"),
+        ):
             return HydraWorkflow(mock_llm, use_per_agent_models=False)
-    
+
     @pytest.fixture
     def sample_context(self):
         """Sample context for testing - includes HITL approvals to skip pause states"""
@@ -37,9 +46,11 @@ class TestHydraWorkflow:
             "target_role": "Senior Platform Engineer",
             # HITL approvals to skip pause states
             "gap_analysis_approved": True,
-            "interview_answers": [{"question": "Tell me about AWS", "answer": "I have 5 years experience"}]
+            "interview_answers": [
+                {"question": "Tell me about AWS", "answer": "I have 5 years experience"}
+            ],
         }
-    
+
     @pytest.fixture
     def mock_agent_results(self):
         """Mock results from all agents"""
@@ -48,103 +59,96 @@ class TestHydraWorkflow:
                 "agent": "Gap Analyzer",
                 "timestamp": "2025-12-06T18:45:00Z",
                 "confidence": 0.95,
-                "requirements_analysis": {"direct_matches": 5, "gaps": 2}
+                "requirements_analysis": {"direct_matches": 5, "gaps": 2},
             },
             "interrogation": {
                 "agent": "Interrogator-Prepper",
                 "timestamp": "2025-12-06T18:45:00Z",
                 "confidence": 0.90,
-                "star_questions": ["Tell me about a time..."]
+                "star_questions": ["Tell me about a time..."],
             },
             "differentiation": {
                 "agent": "Differentiator",
                 "timestamp": "2025-12-06T18:45:00Z",
                 "confidence": 0.88,
-                "unique_value_props": ["AWS expertise", "Python automation"]
+                "unique_value_props": ["AWS expertise", "Python automation"],
             },
             "tailoring": {
                 "agent": "Tailoring Agent",
                 "timestamp": "2025-12-06T18:45:00Z",
                 "confidence": 0.92,
                 "tailored_resume": "Tailored resume content",
-                "tailored_cover_letter": "Tailored cover letter content"
+                "tailored_cover_letter": "Tailored cover letter content",
             },
             "ats_optimization": {
                 "agent": "ATS Optimizer",
                 "timestamp": "2025-12-06T18:45:00Z",
                 "confidence": 0.95,
                 "optimized_resume": "ATS optimized resume content",
-                "optimized_cover_letter": "ATS optimized cover letter content"
+                "optimized_cover_letter": "ATS optimized cover letter content",
             },
             "audit_approved": {
                 "agent": "Auditor Suite",
                 "timestamp": "2025-12-06T18:45:00Z",
                 "confidence": 0.98,
-                "approval": {"approved": True, "reason": "All checks passed"}
+                "approval": {"approved": True, "reason": "All checks passed"},
             },
             "audit_rejected": {
                 "agent": "Auditor Suite",
                 "timestamp": "2025-12-06T18:45:00Z",
                 "confidence": 0.85,
-                "approval": {"approved": False, "reason": "Tone issues found"}
-            }
+                "approval": {"approved": False, "reason": "Tone issues found"},
+            },
         }
-    
+
     def test_initialization(self, mock_llm):
         """Test workflow initialization"""
-        with patch('runtime.crewai.hydra_workflow.GapAnalyzerAgent'), \
-             patch('runtime.crewai.hydra_workflow.InterrogatorPrepperAgent'), \
-             patch('runtime.crewai.hydra_workflow.DifferentiatorAgent'), \
-             patch('runtime.crewai.hydra_workflow.TailoringAgent'), \
-             patch('runtime.crewai.hydra_workflow.ATSOptimizerAgent'), \
-             patch('runtime.crewai.hydra_workflow.AuditorSuiteAgent'), \
-             patch('runtime.crewai.hydra_workflow.ExecutiveSynthesizerAgent'):
+        with (
+            patch("runtime.crewai.hydra_workflow.GapAnalyzerAgent"),
+            patch("runtime.crewai.hydra_workflow.InterrogatorPrepperAgent"),
+            patch("runtime.crewai.hydra_workflow.DifferentiatorAgent"),
+            patch("runtime.crewai.hydra_workflow.TailoringAgent"),
+            patch("runtime.crewai.hydra_workflow.ATSOptimizerAgent"),
+            patch("runtime.crewai.hydra_workflow.AuditorSuiteAgent"),
+            patch("runtime.crewai.hydra_workflow.ExecutiveSynthesizerAgent"),
+        ):
             workflow = HydraWorkflow(mock_llm, max_audit_retries=3, use_per_agent_models=False)
             assert workflow.fallback_llm == mock_llm
             assert workflow.max_audit_retries == 3
             assert workflow.current_state == WorkflowState.INITIALIZED
             assert workflow.execution_log == []
             assert workflow.intermediate_results == {}
-    
+
     def test_execute_missing_job_description(self, workflow):
         """Test execution with missing job_description"""
-        context = {
-            "resume": "Sample resume",
-            "source_documents": "Sample sources"
-        }
-        
+        context = {"resume": "Sample resume", "source_documents": "Sample sources"}
+
         result = workflow.execute(context)
-        
+
         assert result.success is False
         assert result.state == WorkflowState.FAILED
         assert "Missing required context key: job_description" in result.error_message
-    
+
     def test_execute_missing_resume(self, workflow):
         """Test execution with missing resume"""
-        context = {
-            "job_description": "Sample JD",
-            "source_documents": "Sample sources"
-        }
-        
+        context = {"job_description": "Sample JD", "source_documents": "Sample sources"}
+
         result = workflow.execute(context)
-        
+
         assert result.success is False
         assert result.state == WorkflowState.FAILED
         assert "Missing required context key: resume" in result.error_message
-    
+
     def test_execute_missing_source_documents(self, workflow):
         """Test execution with missing source_documents"""
-        context = {
-            "job_description": "Sample JD",
-            "resume": "Sample resume"
-        }
-        
+        context = {"job_description": "Sample JD", "resume": "Sample resume"}
+
         result = workflow.execute(context)
-        
+
         assert result.success is False
         assert result.state == WorkflowState.FAILED
         assert "Missing required context key: source_documents" in result.error_message
-    
+
     def test_execute_success_first_audit_pass(self, workflow, sample_context, mock_agent_results):
         """Test successful execution with audit passing on first attempt"""
         # Mock all agent executions
@@ -154,86 +158,98 @@ class TestHydraWorkflow:
         workflow.tailoring_agent.execute.return_value = mock_agent_results["tailoring"]
         workflow.ats_optimizer.execute.return_value = mock_agent_results["ats_optimization"]
         workflow.auditor_suite.execute.return_value = mock_agent_results["audit_approved"]
-        
+
         result = workflow.execute(sample_context)
-        
+
         assert result.success is True
         assert result.state == WorkflowState.COMPLETED
+        assert result.status == RunStatus.COMPLETED
         assert result.final_documents is not None
         assert result.audit_report is not None
         assert result.audit_report["final_status"] == "APPROVED"
+        # retry_count is part of the SSE/frontend AuditReport contract and must be
+        # present even though the honest audit does not re-run on rejection.
         assert result.audit_report["retry_count"] == 0
-    
-    def test_execute_audit_retry_then_pass(self, workflow, sample_context, mock_agent_results):
-        """Test execution with audit failing once then passing"""
-        # Mock all agent executions
+        assert result.audit_failed is False
+
+    def test_auto_approve_completes_without_pausing(self, mock_llm, mock_agent_results):
+        """With auto_approve and no HITL answers, the run completes instead of pausing."""
+        with (
+            patch("runtime.crewai.hydra_workflow.GapAnalyzerAgent"),
+            patch("runtime.crewai.hydra_workflow.InterrogatorPrepperAgent"),
+            patch("runtime.crewai.hydra_workflow.DifferentiatorAgent"),
+            patch("runtime.crewai.hydra_workflow.TailoringAgent"),
+            patch("runtime.crewai.hydra_workflow.ATSOptimizerAgent"),
+            patch("runtime.crewai.hydra_workflow.AuditorSuiteAgent"),
+            patch("runtime.crewai.hydra_workflow.ExecutiveSynthesizerAgent"),
+        ):
+            workflow = HydraWorkflow(mock_llm, use_per_agent_models=False, auto_approve=True)
+
         workflow.gap_analyzer.execute.return_value = mock_agent_results["gap_analysis"]
         workflow.interrogator_prepper.execute.return_value = mock_agent_results["interrogation"]
         workflow.differentiator.execute.return_value = mock_agent_results["differentiation"]
         workflow.tailoring_agent.execute.return_value = mock_agent_results["tailoring"]
         workflow.ats_optimizer.execute.return_value = mock_agent_results["ats_optimization"]
+        workflow.auditor_suite.execute.return_value = mock_agent_results["audit_approved"]
 
-        # First audit fails, second passes
-        workflow.auditor_suite.execute.side_effect = [
-            mock_agent_results["audit_rejected"],  # First audit fails
-            mock_agent_results["audit_approved"],  # Second audit passes
-            mock_agent_results["audit_approved"],  # Additional calls if needed
-            mock_agent_results["audit_approved"]
-        ]
+        # No gap_analysis_approved, no interview_answers — would pause without auto_approve.
+        context = {
+            "job_description": "JD",
+            "resume": "Resume",
+            "source_documents": "Sources",
+        }
+        result = workflow.execute(context)
 
-        result = workflow.execute(sample_context)
-
-        assert result.success is True
+        assert result.status == RunStatus.COMPLETED
         assert result.state == WorkflowState.COMPLETED
-        # Retry count should be at least 1 (one retry needed)
-        assert result.audit_report["retry_count"] >= 1
 
-    def test_execute_audit_max_retries_exceeded(self, workflow, sample_context, mock_agent_results):
-        """Test execution with audit failing maximum retries - now returns success with audit_failed=True"""
-        # Mock all agent executions
+    def test_execute_audit_rejected(self, workflow, sample_context, mock_agent_results):
+        """A rejection is a valid verdict: documents are kept but flagged, with no retry."""
         workflow.gap_analyzer.execute.return_value = mock_agent_results["gap_analysis"]
         workflow.interrogator_prepper.execute.return_value = mock_agent_results["interrogation"]
         workflow.differentiator.execute.return_value = mock_agent_results["differentiation"]
         workflow.tailoring_agent.execute.return_value = mock_agent_results["tailoring"]
         workflow.ats_optimizer.execute.return_value = mock_agent_results["ats_optimization"]
 
-        # All audit attempts fail
+        # Auditor rejects every document it sees.
         workflow.auditor_suite.execute.return_value = mock_agent_results["audit_rejected"]
 
         result = workflow.execute(sample_context)
 
-        # STABILITY FIX: Audit failures are now non-fatal - documents are still produced
-        assert result.success is True  # Documents were generated
+        # Non-fatal: documents are still produced, but the outcome is explicit.
+        assert result.success is True
         assert result.state == WorkflowState.COMPLETED
-        assert result.audit_failed is True  # But audit failed
-        assert result.audit_error == "Document failed audit after maximum retries"
+        assert result.status == RunStatus.COMPLETED_WITH_AUDIT_CONCERNS
+        assert result.audit_failed is True
         assert result.audit_report["final_status"] == "REJECTED"
-        assert result.final_documents is not None  # Documents still available
-        # Verify auditor was called multiple times (exact count depends on cover letter presence)
-        assert workflow.auditor_suite.execute.call_count >= 3  # At least initial + 2 retries for resume
+        assert result.audit_report["retry_count"] == 0  # SSE/frontend contract
+        assert result.final_documents is not None
+        # Honest gate: each document is audited exactly once (résumé + cover letter),
+        # with no pointless re-audit of unchanged text.
+        assert workflow.auditor_suite.execute.call_count == 2
 
-    def test_execute_audit_crash(self, workflow, sample_context, mock_agent_results):
-        """Test execution with auditor crashing - returns success with audit_failed=True"""
-        # Mock all agent executions up to auditor
+    def test_execute_audit_error(self, workflow, sample_context, mock_agent_results):
+        """A crashing auditor is non-fatal and reported as AUDIT_ERROR."""
         workflow.gap_analyzer.execute.return_value = mock_agent_results["gap_analysis"]
         workflow.interrogator_prepper.execute.return_value = mock_agent_results["interrogation"]
         workflow.differentiator.execute.return_value = mock_agent_results["differentiation"]
         workflow.tailoring_agent.execute.return_value = mock_agent_results["tailoring"]
         workflow.ats_optimizer.execute.return_value = mock_agent_results["ats_optimization"]
 
-        # Auditor crashes on all attempts
+        # Auditor crashes on all attempts (including transient retries).
         workflow.auditor_suite.execute.side_effect = Exception("LLM API timeout")
 
         result = workflow.execute(sample_context)
 
-        # STABILITY FIX: Audit crashes are now non-fatal - documents are still produced
         assert result.success is True  # Documents were generated
         assert result.state == WorkflowState.COMPLETED
+        assert result.status == RunStatus.AUDIT_ERROR
         assert result.audit_failed is True
         assert "Audit crashed" in result.audit_error
-        assert result.audit_report["final_status"] == "AUDIT_CRASHED"
-        assert result.final_documents is not None  # Documents still available
-        assert result.intermediate_results is not None  # Intermediate results preserved
+        assert result.audit_report["final_status"] == "AUDIT_ERROR"
+        assert result.audit_report["retry_count"] == 0  # SSE/frontend contract
+        assert result.final_documents is not None
+        assert result.intermediate_results is not None
 
     def test_execute_agent_failure(self, workflow, sample_context):
         """Test execution with agent failure (pre-audit stages still crash workflow)"""
@@ -281,7 +297,7 @@ class TestHydraWorkflow:
     def test_log_functionality(self, workflow):
         """Test logging functionality"""
         from datetime import datetime
-        
+
         workflow._log("Test log message")
 
         assert len(workflow.execution_log) == 1
@@ -302,7 +318,6 @@ class TestHydraWorkflow:
 
         # Track state changes by patching the state setter
         states_seen = []
-        original_setter = type(workflow).__dict__.get('current_state', None)
 
         def track_state_change(self, value):
             states_seen.append(value)
@@ -311,11 +326,10 @@ class TestHydraWorkflow:
         # Monkey patch to track state changes
         workflow._current_state = WorkflowState.INITIALIZED
         type(workflow).current_state = property(
-            lambda self: self._current_state,
-            track_state_change
+            lambda self: self._current_state, track_state_change
         )
 
-        result = workflow.execute(sample_context)
+        workflow.execute(sample_context)
 
         # Verify state transitions occurred
         expected_states = [
@@ -325,7 +339,7 @@ class TestHydraWorkflow:
             WorkflowState.TAILORING,
             WorkflowState.ATS_OPTIMIZATION,
             WorkflowState.AUDITING,
-            WorkflowState.COMPLETED
+            WorkflowState.COMPLETED,
         ]
 
         for expected_state in expected_states:

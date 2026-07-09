@@ -4,9 +4,8 @@ Verifies the DRY helper method `get_complete_event_payload()` returns
 consistent data for both live completion and reconnection scenarios.
 """
 
-import pytest
-from web.backend.services.job_queue import Job
 from web.backend.models import JobState
+from web.backend.services.job_queue import Job
 
 
 class TestSSECompleteEventFields:

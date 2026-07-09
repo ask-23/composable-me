@@ -8,10 +8,11 @@ This agent maps job requirements to candidate experience and classifies each as:
 - blocker: Cannot be addressed through framing or transfer
 """
 
-from typing import Dict, Any, List
-from runtime.crewai.base_agent import BaseHydraAgent, ValidationError
+from typing import Any, Dict
+
 from crewai import LLM
-import re
+
+from runtime.crewai.base_agent import BaseHydraAgent, ValidationError
 
 
 class GapAnalyzerAgent(BaseHydraAgent):

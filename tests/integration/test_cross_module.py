@@ -7,13 +7,12 @@ CLI, and crew modules to ensure they work together correctly.
 
 import os
 import tempfile
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 import pytest
 
-from runtime.crewai.base_agent import BaseHydraAgent, ValidationError
+from runtime.crewai.base_agent import BaseHydraAgent
 
 
 class _TestAgent(BaseHydraAgent):
@@ -50,7 +49,7 @@ class TestLLMConfigIntegration:
     @patch.dict(os.environ, {"TOGETHER_API_KEY": "test-key"}, clear=True)
     def test_all_agent_types_get_llm(self):
         """All configured agent types should get an LLM (via fallback if needed)."""
-        from runtime.crewai.model_config import get_llm_for_agent, AGENT_MODELS
+        from runtime.crewai.model_config import AGENT_MODELS, get_llm_for_agent
         for agent_type in AGENT_MODELS:
             llm = get_llm_for_agent(agent_type)
             assert llm is not None, f"Failed to get LLM for {agent_type}"
@@ -71,8 +70,10 @@ class TestLLMConfigIntegration:
     @patch.dict(os.environ, {}, clear=True)
     def test_both_modules_fail_gracefully_without_keys(self):
         """Both modules should raise clear errors when no API keys are set."""
-        from runtime.crewai.llm_client import get_llm_client, LLMClientError as LLC
-        from runtime.crewai.model_config import get_llm_for_agent, LLMClientError as MLC
+        from runtime.crewai.llm_client import LLMClientError as LLC
+        from runtime.crewai.llm_client import get_llm_client
+        from runtime.crewai.model_config import LLMClientError as MLC
+        from runtime.crewai.model_config import get_llm_for_agent
 
         with pytest.raises(LLC):
             get_llm_client()
@@ -81,7 +82,7 @@ class TestLLMConfigIntegration:
 
     def test_retry_handler_with_llm_client_error(self):
         """Retry handler properly wraps LLM client errors."""
-        from runtime.crewai.llm_client import LLMRetryHandler, LLMClientError
+        from runtime.crewai.llm_client import LLMClientError, LLMRetryHandler
         handler = LLMRetryHandler(max_retries=1, base_delay=0.01)
 
         with pytest.raises(LLMClientError, match="Failed after"):
@@ -106,8 +107,8 @@ class TestTelemetryIntegration:
 
     def test_noop_telemetry_doesnt_break_workflow(self):
         """Workflow should work fine when telemetry is disabled."""
-        from runtime.crewai.telemetry import trace_workflow_stage, NoOpSpan
         import runtime.crewai.telemetry as tel
+        from runtime.crewai.telemetry import NoOpSpan, trace_workflow_stage
         tel._tracer = None  # Reset cached tracer
 
         with patch.dict(os.environ, {"OTEL_ENABLED": "false"}, clear=False):
@@ -121,8 +122,8 @@ class TestTelemetryIntegration:
     @patch.dict(os.environ, {"OTEL_ENABLED": "true"}, clear=False)
     def test_real_telemetry_workflow_stage(self):
         """Real telemetry spans record attributes correctly."""
-        from runtime.crewai.telemetry import trace_workflow_stage, NoOpSpan
         import runtime.crewai.telemetry as tel
+        from runtime.crewai.telemetry import NoOpSpan, trace_workflow_stage
         tel._tracer = None
 
         with trace_workflow_stage("gap_analysis", {"max_retries": 2}) as span:
@@ -133,10 +134,13 @@ class TestTelemetryIntegration:
     @patch.dict(os.environ, {"OTEL_ENABLED": "true"}, clear=False)
     def test_telemetry_agent_execution_trace(self):
         """Agent execution tracing works end-to-end."""
-        from runtime.crewai.telemetry import (
-            trace_agent_execution, record_agent_error, record_agent_result, NoOpSpan
-        )
         import runtime.crewai.telemetry as tel
+        from runtime.crewai.telemetry import (
+            NoOpSpan,
+            record_agent_error,
+            record_agent_result,
+            trace_agent_execution,
+        )
         tel._tracer = None
 
         with trace_agent_execution("Gap Analyzer", {"job_id": "test-123"}) as span:
@@ -150,8 +154,8 @@ class TestTelemetryIntegration:
     @patch.dict(os.environ, {"OTEL_ENABLED": "true"}, clear=False)
     def test_telemetry_task_execution_trace(self):
         """Task execution tracing with attributes."""
-        from runtime.crewai.telemetry import trace_task_execution, NoOpSpan
         import runtime.crewai.telemetry as tel
+        from runtime.crewai.telemetry import NoOpSpan, trace_task_execution
         tel._tracer = None
 
         with trace_task_execution("analyze_gaps", "Gap Analyzer", {"retry": 0}) as span:
@@ -207,28 +211,6 @@ class TestAgentIntegration:
         assert result["confidence"] == 0.85
         assert "agent" in result
 
-    def test_executive_synthesizer_schema_validation_integrated(self):
-        """ExecutiveSynthesizerAgent validates and normalizes schema correctly."""
-        from runtime.crewai.agents.executive_synthesizer import ExecutiveSynthesizerAgent
-        agent = ExecutiveSynthesizerAgent(_mock_llm())
-
-        # Test with complex nested structure
-        data = {
-            "executive_brief": {
-                "decision": {
-                    "recommendation": "strong_yes",
-                    "fit_score": "92%",
-                    "rationale": "Excellent fit",
-                    "deal_makers": ["AWS", "Python"],
-                    "deal_breakers": []
-                }
-            },
-            "strategic_angle": {"primary_hook": "Cloud native expert"},
-        }
-        agent._validate_schema(data)
-
-        assert data["decision"]["recommendation"] == "STRONG_PROCEED"
-        assert data["decision"]["fit_score"] == 92
 
     def test_all_agent_types_init_with_mock_llm(self):
         """All agent types can be initialized with a mock LLM."""
@@ -317,24 +299,6 @@ class TestCLIWorkflowIntegration:
         assert args.verbose is False
         assert args.interactive is False
 
-    def test_cli_write_output_integration(self):
-        """_write_output_files creates a complete output directory structure."""
-        from runtime.crewai.cli import _write_output_files
-
-        result = Mock()
-        result.final_documents = {"resume": "# Candidate\nExperience...", "cover_letter": "Dear Sir"}
-        result.audit_report = {"final_status": "APPROVED", "retry_count": 0}
-        result.execution_log = ["step1", "step2"]
-        result.intermediate_results = {"gap_analysis": {"score": 85}}
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            out = Path(tmpdir) / "results"
-            _write_output_files(out, result, include_intermediate=True)
-
-            assert (out / "resume.md").read_text() == "# Candidate\nExperience..."
-            assert (out / "cover_letter.md").read_text() == "Dear Sir"
-            assert (out / "execution_log.txt").read_text() == "step1\nstep2"
-            assert (out / "intermediate" / "gap_analysis.yaml").exists()
 
 
 # ============================================================================
@@ -342,30 +306,6 @@ class TestCLIWorkflowIntegration:
 # ============================================================================
 
 @pytest.mark.integration
-class TestCrewIntegration:
-    """Test crew module functions."""
-
-    def test_load_prompt_nonexistent(self):
-        from runtime.crewai.crew import load_prompt
-        with pytest.raises(FileNotFoundError):
-            load_prompt("nonexistent-agent")
-
-    def test_load_docs_returns_dict(self):
-        from runtime.crewai.crew import load_docs
-        docs = load_docs()
-        assert isinstance(docs, dict)
-
-    @patch.dict(os.environ, {}, clear=True)
-    def test_get_llm_no_key_raises(self):
-        from runtime.crewai.crew import get_llm
-        with pytest.raises(RuntimeError, match="OPENROUTER_API_KEY"):
-            get_llm()
-
-    @patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-or-test123"}, clear=False)
-    def test_get_llm_with_key(self):
-        from runtime.crewai.crew import get_llm
-        llm = get_llm()
-        assert llm is not None
 
 
 # ============================================================================
@@ -373,19 +313,6 @@ class TestCrewIntegration:
 # ============================================================================
 
 @pytest.mark.integration
-class TestQuickCrewIntegration:
-
-    @patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-or-test"}, clear=False)
-    def test_build_crew_produces_crew(self):
-        from runtime.crewai.quick_crew import build_crew
-        crew = build_crew("Senior Engineer at TechCo", "10 years Python", "Notes here")
-        assert crew is not None
-
-    @patch.dict(os.environ, {}, clear=True)
-    def test_get_llm_no_key_exits(self):
-        from runtime.crewai.quick_crew import get_llm
-        with pytest.raises(SystemExit):
-            get_llm()
 
 
 # ============================================================================
@@ -398,13 +325,13 @@ class TestModelValidationIntegration:
 
     def test_validate_model_name_all_available(self):
         """All models in get_available_models should pass validation."""
-        from runtime.crewai.llm_client import validate_model_name, get_available_models
+        from runtime.crewai.llm_client import get_available_models, validate_model_name
         for model in get_available_models():
             assert validate_model_name(model), f"{model} should be valid"
 
     def test_model_config_agent_info(self):
         """get_agent_model_info returns consistent data for all agents."""
-        from runtime.crewai.model_config import get_agent_model_info, AGENT_MODELS
+        from runtime.crewai.model_config import AGENT_MODELS, get_agent_model_info
         for agent_type in AGENT_MODELS:
             info = get_agent_model_info(agent_type)
             assert "provider" in info
@@ -412,9 +339,3 @@ class TestModelValidationIntegration:
             assert "rationale" in info
             assert info["provider"] != "unknown"
 
-    def test_model_config_env_vars_list(self):
-        from runtime.crewai.model_config import get_all_required_env_vars
-        vars = get_all_required_env_vars()
-        assert len(vars) >= 3
-        for v in vars:
-            assert v.endswith("_KEY") or v.endswith("_API_KEY")

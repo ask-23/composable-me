@@ -5,10 +5,9 @@ Tests question generation, STAR+ format compliance, thematic grouping,
 interview note validation, and handling unanswered questions.
 """
 
+from unittest.mock import patch
+
 import pytest
-import json
-from unittest.mock import Mock, patch, MagicMock
-from crewai import LLM
 
 from runtime.crewai.agents.interrogator_prepper import InterrogatorPrepperAgent
 from runtime.crewai.base_agent import ValidationError

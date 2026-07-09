@@ -10,35 +10,42 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import Iterable
 
-import yaml
+from runtime.crewai.artifacts import RunInputs, generate_run_id, write_run_artifacts
+from runtime.crewai.hydra_workflow import HydraWorkflow, RunStatus
+from runtime.crewai.llm_client import LLMClientError, get_llm_client
 
-from runtime.crewai.hydra_workflow import HydraWorkflow
-from runtime.crewai.llm_client import get_llm_client, LLMClientError
+# Map an explicit run status to a process exit code.
+EXIT_CODES = {
+    RunStatus.COMPLETED: 0,
+    RunStatus.COMPLETED_WITH_AUDIT_CONCERNS: 1,
+    RunStatus.AUDIT_ERROR: 1,
+    RunStatus.PAUSED: 1,
+    RunStatus.FAILED: 2,
+}
 
 
 def _get_repo_root() -> Path:
     """
     Find the repository root directory by looking for .git/ or requirements.txt.
-    
+
     Searches upward from the current working directory until it finds a directory
     containing either .git/ or requirements.txt, which indicates the repo root.
-    
+
     Returns:
         Path: The repository root directory
-        
+
     Raises:
         FileNotFoundError: If no repo root indicators are found
     """
     current = Path.cwd()
-    
+
     # Search upward through parent directories
     for path in [current] + list(current.parents):
         # Check for .git directory or requirements.txt file
         if (path / ".git").exists() or (path / "requirements.txt").exists():
             return path
-    
+
     # If we can't find repo root, raise an error
     raise FileNotFoundError(
         "Could not find repository root. Looking for directory containing .git/ or requirements.txt"
@@ -48,20 +55,20 @@ def _get_repo_root() -> Path:
 def _validate_repo_structure(repo_root: Path) -> None:
     """
     Validate that the repository has expected directories.
-    
+
     Args:
         repo_root: The repository root directory
-        
+
     Raises:
         FileNotFoundError: If expected directories are missing
     """
     expected_dirs = ["inputs", "examples"]
     missing_dirs = []
-    
+
     for dir_name in expected_dirs:
         if not (repo_root / dir_name).exists():
             missing_dirs.append(dir_name)
-    
+
     if missing_dirs:
         print(f"⚠️  Warning: Expected directories not found: {', '.join(missing_dirs)}")
         print(f"   Repository root: {repo_root}")
@@ -135,31 +142,6 @@ def _read_sources(directory: Path) -> str:
     return "\n".join(parts)
 
 
-def _write_output_files(out_dir: Path, result, include_intermediate: bool = False) -> None:
-    """Write workflow outputs to disk."""
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    final_docs = result.final_documents or {}
-    (out_dir / "resume.md").write_text(final_docs.get("resume", ""))
-    (out_dir / "cover_letter.md").write_text(final_docs.get("cover_letter", ""))
-
-    audit_report = result.audit_report or {}
-    (out_dir / "audit_report.yaml").write_text(yaml.safe_dump(audit_report, sort_keys=False))
-
-    log_lines = result.execution_log or []
-    if isinstance(log_lines, Iterable):
-        (out_dir / "execution_log.txt").write_text("\n".join(log_lines))
-
-    # Write intermediate results if requested (useful for debugging or partial failures)
-    if include_intermediate and result.intermediate_results:
-        intermediate_dir = out_dir / "intermediate"
-        intermediate_dir.mkdir(parents=True, exist_ok=True)
-        for stage_name, stage_result in result.intermediate_results.items():
-            (intermediate_dir / f"{stage_name}.yaml").write_text(
-                yaml.safe_dump(stage_result, sort_keys=False, default_flow_style=False)
-            )
-
-
 def main(argv: list[str] | None = None) -> int:
     """CLI entrypoint. Returns an exit code instead of exiting for testability."""
     parser = build_parser()
@@ -176,14 +158,14 @@ def main(argv: list[str] | None = None) -> int:
     # Resolve paths relative to repo root
     jd_path = Path(args.jd)
     resume_path = Path(args.resume)
-    
+
     # Default sources to same directory as JD file if not specified
     if args.sources:
         sources_dir = Path(args.sources)
     else:
         sources_dir = jd_path.parent
         print(f"ℹ️  No --sources specified, defaulting to: {sources_dir}")
-    
+
     out_dir = Path(args.out)
 
     # Validate that all input paths exist
@@ -209,7 +191,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"❌ LLM configuration error: {err}", file=sys.stderr)
         return 1
 
-    workflow = HydraWorkflow(llm, max_audit_retries=args.max_audit_retries, interactive=args.interactive)
+    workflow = HydraWorkflow(
+        llm,
+        max_audit_retries=args.max_audit_retries,
+        interactive=args.interactive,
+        # A non-interactive CLI run has no way to resume a pause, so it proceeds
+        # past the human gates automatically. `--interactive` uses the real prompts.
+        auto_approve=not args.interactive,
+    )
 
     print("Starting Hydra workflow...\n")
     print(f"Job description: {jd_path}")
@@ -225,41 +214,42 @@ def main(argv: list[str] | None = None) -> int:
 
     result = workflow.execute(context)
 
-    if result.success:
-        # Always write outputs on success (even if audit failed/crashed)
-        include_intermediate = getattr(result, 'audit_failed', False)
-        _write_output_files(out_dir, result, include_intermediate=include_intermediate)
+    # Run-scoped output directory + PII-free manifest.
+    run_id = generate_run_id()
+    inputs = RunInputs(
+        job_description_chars=len(jd_text),
+        resume_chars=len(resume_text),
+        sources_chars=len(sources_text),
+        jd_path=str(jd_path),
+        resume_path=str(resume_path),
+        sources_path=str(sources_dir),
+    )
+    status = result.status
+    # Preserve intermediate stage outputs whenever the run didn't cleanly complete.
+    include_intermediate = status is not RunStatus.COMPLETED
+    run_dir = write_run_artifacts(
+        out_dir, result, run_id=run_id, inputs=inputs, include_intermediate=include_intermediate
+    )
 
-        final_status = result.audit_report.get("final_status") if result.audit_report else "UNKNOWN"
+    exit_code = EXIT_CODES.get(status, 2)
+    final_status = result.audit_report.get("final_status") if result.audit_report else None
 
-        # Different messages based on audit status
-        if getattr(result, 'audit_failed', False):
-            audit_error = getattr(result, 'audit_error', 'Unknown audit error')
-            if final_status == "AUDIT_CRASHED":
-                print(f"⚠️  Documents generated but audit crashed: {audit_error}")
-                print(f"   Documents saved to {out_dir} - MANUAL REVIEW REQUIRED")
-                print(f"   Intermediate results saved to {out_dir}/intermediate/")
-            elif final_status == "REJECTED":
-                print(f"⚠️  Documents generated but audit rejected: {audit_error}")
-                print(f"   Documents saved to {out_dir} - MANUAL REVIEW REQUIRED")
-                print(f"   Check audit_report.yaml for rejection details")
-            else:
-                print(f"⚠️  Documents generated with audit status: {final_status}")
-                print(f"   Outputs saved to {out_dir}")
-            return 1  # Partial success exit code
-        else:
-            print(f"✅ Success! Audit status: {final_status}. Outputs saved to {out_dir}")
-            return 0
+    if status is RunStatus.COMPLETED:
+        print(f"✅ Success! Audit: {final_status}. Outputs → {run_dir}")
+    elif status is RunStatus.COMPLETED_WITH_AUDIT_CONCERNS:
+        print(f"⚠️  Documents generated but audit rejected: {result.audit_error}")
+        print(f"   Outputs → {run_dir} — review audit_report.yaml before sending.")
+    elif status is RunStatus.AUDIT_ERROR:
+        print(f"⚠️  Documents generated but the audit stage errored: {result.audit_error}")
+        print(f"   Outputs → {run_dir} — MANUAL REVIEW REQUIRED.")
+    elif status is RunStatus.PAUSED:
+        print(f"⏸  Run paused awaiting input: {result.error_message}")
+        print("   Re-run with --interactive to answer inline. Partial results →", run_dir)
+    else:  # FAILED
+        print(f"❌ Workflow failed: {result.error_message}", file=sys.stderr)
+        print(f"   Partial results → {run_dir}", file=sys.stderr)
 
-    # True failure - workflow crashed before producing documents
-    print(f"❌ Workflow failed: {result.error_message}", file=sys.stderr)
-
-    # Still try to save intermediate results if available
-    if result.intermediate_results:
-        _write_output_files(out_dir, result, include_intermediate=True)
-        print(f"   Partial results saved to {out_dir}/intermediate/", file=sys.stderr)
-
-    return 2
+    return exit_code
 
 
 if __name__ == "__main__":

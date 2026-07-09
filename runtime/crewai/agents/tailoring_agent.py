@@ -8,10 +8,11 @@ This agent generates tailored resumes and cover letters that:
 - Comply strictly with truth laws from AGENTS.MD
 """
 
-from typing import Dict, Any, List
-from runtime.crewai.base_agent import BaseHydraAgent, ValidationError
+from typing import Any, Dict
+
 from crewai import LLM
-import re
+
+from runtime.crewai.base_agent import BaseHydraAgent, ValidationError
 
 
 class TailoringAgent(BaseHydraAgent):

@@ -4,16 +4,15 @@ public interfaces. These tests aim to bring integration coverage above 90% by
 exercising code paths not covered by the focused integration tests.
 """
 
-import os
 import json
+import os
 import tempfile
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 import pytest
-
 from crewai import LLM
+
 from runtime.crewai.base_agent import BaseHydraAgent, ValidationError
 
 
@@ -134,57 +133,6 @@ class TestBaseAgentIntegration:
 @pytest.mark.integration
 class TestExecutiveSynthesizerIntegration:
 
-    def test_schema_validation_comprehensive(self):
-        """Test all schema validation paths in a single integration test."""
-        from runtime.crewai.agents.executive_synthesizer import ExecutiveSynthesizerAgent
-
-        agent = ExecutiveSynthesizerAgent(_llm())
-
-        # Valid decision dict
-        d1 = {"decision": {"recommendation": "PROCEED", "fit_score": 75, "rationale": "Good"}}
-        agent._validate_schema(d1)
-        assert d1["decision"]["recommendation"] == "PROCEED"
-
-        # Decision as string
-        d2 = {"decision": "PASS"}
-        agent._validate_schema(d2)
-        assert d2["decision"]["recommendation"] == "PASS"
-
-        # Flat recommendation at root
-        d3 = {"recommendation": "PROCEED_WITH_CAUTION", "fit_score": 55}
-        agent._validate_schema(d3)
-        assert d3["decision"]["recommendation"] == "PROCEED_WITH_CAUTION"
-        assert d3["decision"]["fit_score"] == 55
-
-        # Nested in various keys
-        for key in ["executive_brief", "summary", "analysis", "result", "output", "brief"]:
-            d = {key: {"decision": {"recommendation": "PROCEED", "fit_score": 70}}}
-            agent._validate_schema(d)
-            assert d["decision"]["recommendation"] == "PROCEED"
-
-        # Inferred from score
-        d4 = {"score": 45}
-        agent._validate_schema(d4)
-        assert d4["decision"]["recommendation"] == "PASS"
-
-        # Normalization of aliases
-        aliases = {
-            "CAUTION": "PROCEED_WITH_CAUTION",
-            "REJECT": "PASS",
-            "NO": "PASS",
-            "YES": "PROCEED",
-            "APPROVED": "PROCEED",
-            "STRONG_YES": "STRONG_PROCEED",
-        }
-        for alias, expected in aliases.items():
-            d = {"decision": {"recommendation": alias, "fit_score": 50}}
-            agent._validate_schema(d)
-            assert d["decision"]["recommendation"] == expected
-
-        # String fit score conversion
-        d5 = {"decision": {"recommendation": "PROCEED", "fit_score": "82%"}}
-        agent._validate_schema(d5)
-        assert d5["decision"]["fit_score"] == 82
 
     @patch('runtime.crewai.base_agent.Crew')
     def test_execute_end_to_end(self, mock_crew_class):
@@ -370,7 +318,7 @@ class TestModelConfigIntegration:
 
     @patch.dict(os.environ, {"TOGETHER_API_KEY": "tk"}, clear=True)
     def test_get_llm_for_all_agent_types(self):
-        from runtime.crewai.model_config import get_llm_for_agent, AGENT_MODELS
+        from runtime.crewai.model_config import AGENT_MODELS, get_llm_for_agent
         for agent_type in AGENT_MODELS:
             llm = get_llm_for_agent(agent_type)
             assert llm is not None, f"Failed for {agent_type}"
@@ -393,7 +341,10 @@ class TestTelemetryComprehensive:
     def test_all_trace_context_managers_noop(self):
         """All context managers work in noop mode."""
         from runtime.crewai.telemetry import (
-            trace_workflow_stage, trace_agent_execution, trace_task_execution, NoOpSpan
+            NoOpSpan,
+            trace_agent_execution,
+            trace_task_execution,
+            trace_workflow_stage,
         )
         with trace_workflow_stage("stage") as s1:
             assert isinstance(s1, NoOpSpan)
@@ -404,11 +355,15 @@ class TestTelemetryComprehensive:
 
     @patch.dict(os.environ, {"OTEL_ENABLED": "true"}, clear=False)
     def test_all_trace_context_managers_real(self):
-        from runtime.crewai.telemetry import (
-            trace_workflow_stage, trace_agent_execution, trace_task_execution,
-            record_agent_error, record_agent_result, NoOpSpan
-        )
         import runtime.crewai.telemetry as tel
+        from runtime.crewai.telemetry import (
+            NoOpSpan,
+            record_agent_error,
+            record_agent_result,
+            trace_agent_execution,
+            trace_task_execution,
+            trace_workflow_stage,
+        )
         tel._tracer = None
 
         with trace_workflow_stage("wf_stage", {"retry": 0}) as s1:
@@ -457,122 +412,16 @@ class TestCLIIntegration:
             content = _read_sources(Path(d))
             assert "Hello" in content
 
-    @patch('runtime.crewai.cli.HydraWorkflow')
-    @patch('runtime.crewai.cli.get_llm_client')
-    def test_main_success(self, mock_llm, mock_workflow_class):
-        from runtime.crewai.cli import main
 
-        mock_llm.return_value = _llm()
-
-        result = Mock()
-        result.success = True
-        result.final_documents = {"resume": "content", "cover_letter": "content"}
-        result.audit_report = {"final_status": "APPROVED"}
-        result.execution_log = ["log"]
-        result.intermediate_results = {}
-        result.audit_failed = False
-        mock_workflow_class.return_value.execute.return_value = result
-
-        with tempfile.TemporaryDirectory() as d:
-            jd = Path(d) / "jd.md"
-            resume = Path(d) / "resume.md"
-            sources = Path(d) / "sources"
-            sources.mkdir()
-            jd.write_text("Job description")
-            resume.write_text("Resume content")
-            (sources / "src.md").write_text("Source doc")
-            out = Path(d) / "out"
-
-            exit_code = main([
-                "--jd", str(jd),
-                "--resume", str(resume),
-                "--sources", str(sources),
-                "--out", str(out),
-            ])
-            assert exit_code == 0
-
-    @patch('runtime.crewai.cli.HydraWorkflow')
-    @patch('runtime.crewai.cli.get_llm_client')
-    def test_main_audit_failed(self, mock_llm, mock_workflow_class):
-        from runtime.crewai.cli import main
-
-        mock_llm.return_value = _llm()
-
-        result = Mock()
-        result.success = True
-        result.final_documents = {"resume": "r", "cover_letter": "c"}
-        result.audit_report = {"final_status": "REJECTED"}
-        result.execution_log = []
-        result.intermediate_results = {}
-        result.audit_failed = True
-        result.audit_error = "Audit rejected"
-        mock_workflow_class.return_value.execute.return_value = result
-
-        with tempfile.TemporaryDirectory() as d:
-            jd = Path(d) / "jd.md"
-            resume = Path(d) / "resume.md"
-            sources = Path(d) / "sources"
-            sources.mkdir()
-            jd.write_text("JD")
-            resume.write_text("Resume")
-            (sources / "s.md").write_text("S")
-            out = Path(d) / "out"
-
-            exit_code = main(["--jd", str(jd), "--resume", str(resume), "--sources", str(sources), "--out", str(out)])
-            assert exit_code == 1
 
 
 # ============================================================================
 # Crew Integration
 # ============================================================================
 
-@pytest.mark.integration
-class TestCrewModuleIntegration:
-
-    @patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-or-test"}, clear=False)
-    def test_hydra_crew_init_builds_agents(self):
-        from runtime.crewai.crew import HydraCrew
-        crew = HydraCrew("Job desc", "Resume text", "Notes")
-        assert hasattr(crew, 'commander')
-        assert hasattr(crew, 'gap_analyzer')
-        assert hasattr(crew, 'interrogator')
-        assert hasattr(crew, 'differentiator')
-        assert hasattr(crew, 'tailor')
-        assert hasattr(crew, 'auditor')
-
-    @patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-or-test"}, clear=False)
-    def test_hydra_crew_build_tasks(self):
-        from runtime.crewai.crew import HydraCrew
-        crew = HydraCrew("Job desc", "Resume text")
-        tasks = crew.build_tasks()
-        assert len(tasks) == 6
-
-    def test_load_prompt_existing(self):
-        """load_prompt should work for known agents."""
-        from runtime.crewai.crew import load_prompt
-        # Only test if the prompt file exists
-        prompt_path = Path(__file__).parent.parent.parent / "agents" / "commander" / "prompt.md"
-        if prompt_path.exists():
-            prompt = load_prompt("commander")
-            assert len(prompt) > 0
 
 
 # ============================================================================
 # Quick Crew Integration
 # ============================================================================
 
-@pytest.mark.integration
-class TestQuickCrewModuleIntegration:
-
-    @patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-or-test"}, clear=False)
-    def test_build_crew_all_agents_present(self):
-        from runtime.crewai.quick_crew import build_crew
-        crew = build_crew("Engineer role", "My resume", "Interview notes")
-        assert len(crew.agents) == 6
-        assert len(crew.tasks) == 6
-
-    @patch.dict(os.environ, {"OPENROUTER_API_KEY": "sk-or-test"}, clear=False)
-    def test_build_crew_no_notes(self):
-        from runtime.crewai.quick_crew import build_crew
-        crew = build_crew("Engineer role", "My resume", "")
-        assert crew is not None

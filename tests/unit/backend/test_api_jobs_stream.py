@@ -1,7 +1,9 @@
 
-import pytest
 from unittest.mock import MagicMock, patch
+
 from web.backend.models import JobState
+
+
 def test_stream_job_success(test_client):
     """Test streaming job events"""
     # Create mock job with async event generator

@@ -83,7 +83,7 @@ class JobsController(Controller):
         job = job_queue.get_job(job_id)
         if not job:
             raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="Job not found")
-        
+
         if job.state != JobState.GAP_ANALYSIS_REVIEW:
             # Idempotency: if user clicks twice or UI is stale, treat "already advanced" as a no-op.
             if _is_after_state(job.state, JobState.GAP_ANALYSIS_REVIEW):
@@ -92,18 +92,27 @@ class JobsController(Controller):
                     "status": "noop",
                     "message": "Job already advanced past GAP_ANALYSIS_REVIEW",
                 }
-            raise HTTPException(status_code=400, detail=f"Job is not in GAP_ANALYSIS_REVIEW state (current: {job.state})")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Job is not in GAP_ANALYSIS_REVIEW state (current: {job.state})",
+            )
 
         # Update job and get the updated object (crucial for workflow to see the approval)
         job = job_queue.update_job(job_id, gap_analysis_approved=data.approved)
 
         # Resume workflow with updated job
         start_workflow_background(job)
-        
-        return {"job_id": job_id, "status": "approved", "message": "Gap analysis approved, workflow resumed"}
+
+        return {
+            "job_id": job_id,
+            "status": "approved",
+            "message": "Gap analysis approved, workflow resumed",
+        }
 
     @post("/{job_id:str}/submit_interview_answers", status_code=HTTP_200_OK)
-    async def submit_interview_answers(self, job_id: str, data: SubmitInterviewAnswersRequest) -> dict:
+    async def submit_interview_answers(
+        self, job_id: str, data: SubmitInterviewAnswersRequest
+    ) -> dict:
         """Submit interview answers and resume workflow."""
         job = job_queue.get_job(job_id)
         if not job:
@@ -116,7 +125,10 @@ class JobsController(Controller):
                     "status": "noop",
                     "message": "Job already advanced past INTERROGATION_REVIEW",
                 }
-            raise HTTPException(status_code=400, detail=f"Job is not in INTERROGATION_REVIEW state (current: {job.state})")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Job is not in INTERROGATION_REVIEW state (current: {job.state})",
+            )
 
         # Update job and get the updated object (crucial for workflow to see the answers)
         job = job_queue.update_job(job_id, interview_answers=data.answers)
@@ -124,7 +136,11 @@ class JobsController(Controller):
         # Resume workflow with updated job
         start_workflow_background(job)
 
-        return {"job_id": job_id, "status": "submitted", "message": "Interview answers submitted, workflow resumed"}
+        return {
+            "job_id": job_id,
+            "status": "submitted",
+            "message": "Interview answers submitted, workflow resumed",
+        }
 
     @get("/{job_id:str}", status_code=HTTP_200_OK)
     def get_job(self, job_id: str) -> JobResponse:
@@ -144,13 +160,20 @@ class JobsController(Controller):
 
         audit_report = None
         if job.audit_report:
+            raw_status = job.audit_report.get("final_status")
+            # Unknown/new status strings must not 500 the whole job fetch.
+            try:
+                final_status = AuditStatus(raw_status) if raw_status else None
+            except ValueError:
+                final_status = None
             audit_report = AuditReport(
                 resume_audit=job.audit_report.get("resume_audit"),
                 cover_letter_audit=job.audit_report.get("cover_letter_audit"),
-                final_status=AuditStatus(job.audit_report.get("final_status")) if job.audit_report.get("final_status") else None,
+                final_status=final_status,
                 retry_count=job.audit_report.get("retry_count", 0),
                 rejection_reason=job.audit_report.get("rejection_reason"),
-                crash_error=job.audit_report.get("crash_error"),
+                # Workflow emits "error"; keep "crash_error" fallback for legacy rows.
+                crash_error=job.audit_report.get("error", job.audit_report.get("crash_error")),
             )
 
         return JobResponse(
@@ -193,13 +216,16 @@ class JobsController(Controller):
         async def event_generator() -> AsyncGenerator[bytes, None]:
             """Generate SSE events."""
             # Send initial state
-            yield _format_sse_event("connected", {
-                "job_id": job.id,
-                "state": job.state.value,
-                "progress": job.get_progress_percent(),
-                "intermediate_results": job.intermediate_results,
-                "agent_models": job.agent_models,
-            })
+            yield _format_sse_event(
+                "connected",
+                {
+                    "job_id": job.id,
+                    "state": job.state.value,
+                    "progress": job.get_progress_percent(),
+                    "intermediate_results": job.intermediate_results,
+                    "agent_models": job.agent_models,
+                },
+            )
 
             # If already complete, send final state and close
             if job.state in (JobState.COMPLETED, JobState.FAILED):

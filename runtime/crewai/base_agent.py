@@ -8,15 +8,16 @@ Provides common functionality for all agents including:
 - Truth rules enforcement
 """
 
-from pathlib import Path
-from typing import Dict, Any, Optional, List
-from abc import ABC, abstractmethod
 import json
 import re
+from abc import ABC, abstractmethod
 from datetime import datetime
-from crewai import Agent, Task, Crew, Process, LLM
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from runtime.crewai.telemetry import trace_agent_execution, record_agent_error, record_agent_result
+from crewai import LLM, Agent, Crew, Process, Task
+
+from runtime.crewai.telemetry import record_agent_error, record_agent_result, trace_agent_execution
 
 # Constants
 DEFAULT_CONFIDENCE = 0.8
@@ -39,21 +40,22 @@ DEFAULT_STYLE_GUIDE = """\
 
 class ValidationError(Exception):
     """Raised when agent output validation fails"""
+
     pass
 
 
 class BaseHydraAgent(ABC):
     """Base class for all Hydra agents"""
-    
+
     # Subclasses must define these
     role: str = ""
     goal: str = ""
     expected_output: str = ""
-    
+
     def __init__(self, llm: LLM, prompt_path: Optional[str] = None, use_json_mode: bool = True):
         """
         Initialize base agent.
-        
+
         Args:
             llm: The LLM instance to use
             prompt_path: Path to agent prompt file (relative to project root)
@@ -65,95 +67,89 @@ class BaseHydraAgent(ABC):
         self.truth_rules = self._load_truth_rules()
         self.style_guide = self._load_style_guide()
         self.use_json_mode = use_json_mode
-    
+
     def _get_project_root(self) -> Path:
         """Get project root directory"""
         # Navigate up from runtime/crewai/ to project root
         return Path(__file__).parent.parent.parent
-    
+
     def _load_prompt(self) -> str:
         """Load agent prompt from file"""
         if not self.prompt_path:
             return ""
-        
+
         project_root = self._get_project_root()
         prompt_file = project_root / self.prompt_path
-        
+
         if not prompt_file.exists():
             raise FileNotFoundError(f"Prompt file not found: {prompt_file}")
-        
+
         return prompt_file.read_text()
-    
+
+    def _load_first(self, candidates: List[str], default: str) -> str:
+        """Return the contents of the first existing candidate path, else default.
+
+        Filenames are matched case-insensitively so the canonical docs load on both
+        case-sensitive (Linux/CI) and case-insensitive (macOS) filesystems.
+        """
+        project_root = self._get_project_root()
+        for candidate in candidates:
+            path = project_root / candidate
+            if path.exists():
+                return path.read_text()
+            # Case-insensitive fallback within the candidate's directory.
+            parent = path.parent
+            if parent.exists():
+                for entry in parent.iterdir():
+                    if entry.is_file() and entry.name.lower() == path.name.lower():
+                        return entry.read_text()
+        return default
+
     def _load_truth_rules(self) -> str:
-        """Load AGENTS.MD truth laws"""
-        project_root = self._get_project_root()
-        agents_file = project_root / "docs" / "AGENTS.MD"
-        
-        if agents_file.exists():
-            return agents_file.read_text()
-        
-        # Fallback to root AGENTS.md if docs/ doesn't exist
-        agents_file = project_root / "AGENTS.md"
-        if agents_file.exists():
-            return agents_file.read_text()
-        
-        return DEFAULT_TRUTH_RULES
-    
+        """Load the canonical truth rules (docs/AGENTS.MD), else a built-in default."""
+        return self._load_first(["docs/AGENTS.MD", "AGENTS.md"], DEFAULT_TRUTH_RULES)
+
     def _load_style_guide(self) -> str:
-        """Load STYLE_GUIDE.MD"""
-        project_root = self._get_project_root()
-        style_file = project_root / "docs" / "STYLE_GUIDE.MD"
-        
-        if style_file.exists():
-            return style_file.read_text()
-        
-        return DEFAULT_STYLE_GUIDE
-    
+        """Load the canonical style guide (docs/STYLE_GUIDE.MD), else a built-in default."""
+        return self._load_first(["docs/STYLE_GUIDE.MD", "STYLE_GUIDE.md"], DEFAULT_STYLE_GUIDE)
+
     def create_agent(self) -> Agent:
         """Create CrewAI agent with prompt and rules"""
         backstory = self._build_backstory()
-        
+
         return Agent(
             role=self.role,
             goal=self.goal,
             backstory=backstory,
             llm=self.llm,
             verbose=True,
-            allow_delegation=False
+            allow_delegation=False,
         )
-    
+
     def _build_backstory(self) -> str:
         """Build agent backstory with prompt and rules"""
         parts = []
-        
+
         if self.prompt:
             parts.append(self.prompt)
-        
+
         if self.truth_rules:
             parts.append("\n\nTRUTH RULES (INVIOLABLE):")
             parts.append(self.truth_rules)
-        
+
         if self.style_guide and self._needs_style_guide():
             parts.append("\n\nSTYLE GUIDE:")
             parts.append(self.style_guide)
-        
+
         return "\n".join(parts)
-    
+
     def _needs_style_guide(self) -> bool:
         """Check if this agent needs the style guide"""
         # Only agents that generate user-facing content need style guide
-        style_guide_agents = {
-            "Tailoring Agent",
-            "Differentiator",
-            "Auditor Suite"
-        }
+        style_guide_agents = {"Tailoring Agent", "Differentiator", "Auditor Suite"}
         return self.role in style_guide_agents
-    
-    def create_task(
-        self,
-        description: str,
-        context: Optional[List[Task]] = None
-    ) -> Task:
+
+    def create_task(self, description: str, context: Optional[List[Task]] = None) -> Task:
         """Create CrewAI task for this agent"""
         # Add required base fields to task description
         enhanced_description = f"""{description}
@@ -165,24 +161,24 @@ IMPORTANT: Your output MUST be valid JSON and include these required fields at t
 
 Return ONLY valid JSON. Do not include any text before or after the JSON object.
 """
-        
+
         return Task(
             description=enhanced_description,
             expected_output=self.expected_output,
             agent=self.create_agent(),
-            context=context or []
+            context=context or [],
         )
-    
+
     def validate_output(self, output: str) -> Dict[str, Any]:
         """
         Validate and parse agent output as JSON.
-        
+
         Args:
             output: Raw output string from agent
-            
+
         Returns:
             Parsed and validated output dictionary
-            
+
         Raises:
             ValidationError: If output is invalid JSON
         """
@@ -191,51 +187,56 @@ Return ONLY valid JSON. Do not include any text before or after the JSON object.
         self._promote_nested_base_fields(parsed)
         self._validate_schema(parsed)
         return parsed
-    
+
     def _clean_output(self, output: str) -> str:
         """Clean and extract JSON from raw output."""
         cleaned = output.strip()
-        
+
         # Remove markdown code fences
         if cleaned.startswith("```json"):
-            cleaned = re.sub(r'^```json\s*\n?', '', cleaned)
-            cleaned = re.sub(r'\n?```\s*$', '', cleaned)
+            cleaned = re.sub(r"^```json\s*\n?", "", cleaned)
+            cleaned = re.sub(r"\n?```\s*$", "", cleaned)
         elif cleaned.startswith("```"):
-            cleaned = re.sub(r'^```\s*\n?', '', cleaned)
-            cleaned = re.sub(r'\n?```\s*$', '', cleaned)
-        
+            cleaned = re.sub(r"^```\s*\n?", "", cleaned)
+            cleaned = re.sub(r"\n?```\s*$", "", cleaned)
+
         cleaned = cleaned.strip()
-        
+
         # Extract JSON from surrounding text
-        first_brace = cleaned.find('{')
-        last_brace = cleaned.rfind('}')
-        
+        first_brace = cleaned.find("{")
+        last_brace = cleaned.rfind("}")
+
         if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-            cleaned = cleaned[first_brace:last_brace + 1]
-        
+            cleaned = cleaned[first_brace : last_brace + 1]
+
         return cleaned
-    
+
     def _parse_json(self, json_str: str) -> Dict[str, Any]:
-        """Parse JSON string with error recovery."""
+        """Parse JSON string with limited, safe error recovery.
+
+        The only automatic repair is stripping trailing commas — a common,
+        unambiguous LLM mistake. We deliberately do NOT blanket-replace single
+        quotes with double quotes: that corrupts legitimate apostrophes inside
+        string values (e.g. "the candidate's experience").
+        """
         try:
             parsed = json.loads(json_str)
-        except json.JSONDecodeError as e:
-            # Try to fix common JSON issues
+        except json.JSONDecodeError:
             try:
-                # Fix trailing commas (common LLM mistake)
-                fixed = re.sub(r',(\s*[}\]])', r'\1', json_str)
-                # Fix single quotes (should be double quotes)
-                fixed = fixed.replace("'", '"')
+                # Remove trailing commas before a closing } or ].
+                fixed = re.sub(r",(\s*[}\]])", r"\1", json_str)
                 parsed = json.loads(fixed)
             except json.JSONDecodeError as e2:
-                raise ValidationError(f"Invalid JSON output: {e2}\n\nOutput was:\n{json_str[:500]}")
-        
+                raise ValidationError(
+                    f"Invalid JSON output: {e2}\n\nOutput was:\n{json_str[:500]}"
+                ) from e2
+
         # Validate that result is a dictionary
         if not isinstance(parsed, dict):
             raise ValidationError("Output must be a JSON object (dictionary)")
-        
+
         return parsed
-    
+
     def _promote_nested_base_fields(self, parsed: Dict[str, Any]) -> None:
         """Promote base fields from nested structure if needed."""
         # Check if base fields are nested in a single top-level key
@@ -247,32 +248,32 @@ Return ONLY valid JSON. Do not include any text before or after the JSON object.
                 for field in ["agent", "timestamp", "confidence"]:
                     if field in nested_data:
                         parsed[field] = nested_data[field]
-    
+
     def _validate_schema(self, data: Dict[str, Any]) -> None:
         """
         Validate output contains required fields.
-        
+
         Subclasses should override to add specific validation.
-        
+
         Args:
             data: Parsed output dictionary
-            
+
         Raises:
             ValidationError: If required fields are missing
         """
         # All agents must include these fields - add defaults if missing
         if "agent" not in data:
             data["agent"] = self.role
-        
+
         if "timestamp" not in data:
             data["timestamp"] = datetime.now().isoformat() + "Z"
-        
+
         if "confidence" not in data:
             data["confidence"] = DEFAULT_CONFIDENCE
-        
+
         # Validate and normalize confidence
         data["confidence"] = self._normalize_confidence(data["confidence"])
-    
+
     def _normalize_confidence(self, confidence: Any) -> float:
         """Normalize confidence value to valid range [0.0, 1.0]."""
         if not isinstance(confidence, (int, float)):
@@ -281,14 +282,12 @@ Return ONLY valid JSON. Do not include any text before or after the JSON object.
                 confidence = float(confidence)
             except (ValueError, TypeError):
                 return DEFAULT_CONFIDENCE
-        
+
         # Clamp to valid range
         return max(MIN_CONFIDENCE, min(MAX_CONFIDENCE, float(confidence)))
-    
+
     def execute_with_retry(
-        self,
-        task: Task,
-        max_retries: int = DEFAULT_MAX_RETRIES
+        self, task: Task, max_retries: int = DEFAULT_MAX_RETRIES
     ) -> Dict[str, Any]:
         """
         Execute task with retry logic.
@@ -328,7 +327,7 @@ Return ONLY valid JSON. Do not include any text before or after the JSON object.
 
                     return validated
 
-                except (ValidationError, Exception) as e:
+                except Exception as e:
                     last_error = e
                     span.add_event(f"retry.{attempt + 1}", {"error": str(e)})
 
@@ -345,17 +344,17 @@ Return ONLY valid JSON. Do not include any text before or after the JSON object.
             raise ValidationError(
                 f"Agent {self.role} failed after {max_retries + 1} attempts: {last_error}"
             )
-    
+
     @abstractmethod
     def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute the agent with given context.
-        
+
         Subclasses must implement this method.
-        
+
         Args:
             context: Input context for the agent
-            
+
         Returns:
             Agent output dictionary
         """

@@ -10,9 +10,9 @@ Covers:
 import json
 import logging
 import os
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
 
 # ============================================================
 # Central PII Redaction (pii.py)
@@ -410,7 +410,7 @@ class TestSSEErrorPayloads:
         assert payload["error_type"] == "unknown"
 
     def test_build_error_payload_all_valid_types(self):
-        from web.backend.observability.sse_errors import build_error_payload, ERROR_TYPES
+        from web.backend.observability.sse_errors import ERROR_TYPES, build_error_payload
         for error_type in ERROR_TYPES:
             payload = build_error_payload(
                 job_id="j-1", error="fail", error_type=error_type
@@ -506,7 +506,7 @@ class TestStructuredErrors:
     """HydraError structured error class tests."""
 
     def test_hydra_error_creation(self):
-        from web.backend.errors import HydraError, ErrorCategory, ErrorSeverity
+        from web.backend.errors import ErrorCategory, ErrorSeverity, HydraError
         error = HydraError(
             code=ErrorCategory.LLM_ERROR,
             message="LLM call failed",
@@ -520,7 +520,7 @@ class TestStructuredErrors:
         assert error.agent == "gap_analyzer"
 
     def test_hydra_error_sanitizes_pii_on_creation(self):
-        from web.backend.errors import HydraError, ErrorCategory
+        from web.backend.errors import ErrorCategory, HydraError
         error = HydraError(
             code=ErrorCategory.LLM_ERROR,
             message="Failed for user@test.com",
@@ -531,7 +531,7 @@ class TestStructuredErrors:
         assert "admin@corp.com" not in str(error.context)
 
     def test_hydra_error_from_exception(self):
-        from web.backend.errors import HydraError, ErrorCategory
+        from web.backend.errors import ErrorCategory, HydraError
         try:
             raise ValueError("Something went wrong for user@test.com")
         except ValueError as exc:
@@ -548,7 +548,7 @@ class TestStructuredErrors:
         assert error.stack_trace is not None
 
     def test_hydra_error_to_dict(self):
-        from web.backend.errors import HydraError, ErrorCategory, ErrorSeverity
+        from web.backend.errors import ErrorCategory, ErrorSeverity, HydraError
         error = HydraError(
             code=ErrorCategory.DATABASE_ERROR,
             message="DB connection lost",
@@ -562,7 +562,7 @@ class TestStructuredErrors:
         assert d["job_id"] == "j-3"
 
     def test_hydra_error_to_json(self):
-        from web.backend.errors import HydraError, ErrorCategory
+        from web.backend.errors import ErrorCategory, HydraError
         error = HydraError(
             code=ErrorCategory.VALIDATION_ERROR,
             message="Invalid input",
@@ -573,7 +573,7 @@ class TestStructuredErrors:
         assert parsed["message"] == "Invalid input"
 
     def test_hydra_error_to_user_message(self):
-        from web.backend.errors import HydraError, ErrorCategory
+        from web.backend.errors import ErrorCategory, HydraError
         error = HydraError(
             code=ErrorCategory.AGENT_ERROR,
             message="Agent failed to produce output",
