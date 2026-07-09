@@ -39,6 +39,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 # E402: tests may set up sys.path before importing the package under test.
-"tests/**" = ["B011", "F811", "E402"]
+# F841: coverage tests frequently bind `result = call()` without asserting on it.
+"tests/**" = ["B011", "F811", "E402", "F841"]
 
 # Test configuration lives in pytest.ini (source of truth).

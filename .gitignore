@@ -108,6 +108,8 @@ datagrip-*.xml
 .junie/
 *resume*
 *Resume*
+!examples/validated-output/resume.md
+!examples/validated-output/source_resume.md
 *_jd*
 .env
 .env.*

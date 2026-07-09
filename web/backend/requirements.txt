@@ -14,5 +14,8 @@ opentelemetry-exporter-otlp>=1.20.0
 opentelemetry-instrumentation>=0.41b0
 opentelemetry-instrumentation-asgi>=0.41b0
 
+# Sentry - Error Tracking (noop when SENTRY_DSN not set)
+sentry-sdk[litestar]>=2.0.0
+
 # Reference parent package for HydraWorkflow
 # Run with: PYTHONPATH=<REPO_ROOT> python -m uvicorn app:app

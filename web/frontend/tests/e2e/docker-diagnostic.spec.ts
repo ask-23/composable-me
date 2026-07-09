@@ -12,6 +12,7 @@ test.use({ baseURL: 'http://localhost:4321' });
 
 test.describe('Docker App Diagnostic', () => {
     test('simulates real user flow through Docker app', async ({ page }) => {
+        test.skip(!!process.env.CI, 'Requires Docker app running at localhost:4321');
         test.setTimeout(600000); // 10 minutes
 
         // 1. Navigate to upload page
