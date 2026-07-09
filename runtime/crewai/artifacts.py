@@ -81,13 +81,19 @@ def build_manifest(run_id: str, result: Any, inputs: Optional[RunInputs] = None)
     if error_message:
         warnings.append(_sanitize_warning(error_message))
 
+    # "passed" is derived from an explicit APPROVED verdict, and is null when no audit
+    # ran (e.g. a pre-audit failure). Do NOT infer "passed" from audit_failed's default
+    # False, or a failed run with no audit would falsely claim the audit passed.
+    final_status = audit_report.get("final_status")
+    audit_passed = (final_status == "APPROVED") if final_status else None
+
     manifest = {
         "run_id": run_id,
         "status": status.value if hasattr(status, "value") else status,
         "success": getattr(result, "success", None),
         "audit": {
-            "final_status": audit_report.get("final_status"),
-            "passed": not getattr(result, "audit_failed", False),
+            "final_status": final_status,
+            "passed": audit_passed,
         },
         "decision": {
             "recommendation": decision.get("recommendation"),

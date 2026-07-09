@@ -44,7 +44,7 @@ def test_build_manifest_summarizes_outcome_without_pii():
     assert manifest["run_id"] == "rid"
     assert manifest["status"] == "completed"
     assert manifest["audit"]["final_status"] == "APPROVED"
-    assert manifest["audit"]["passed"] is True
+    assert manifest["audit"]["passed"] is True  # explicit APPROVED verdict
     assert manifest["decision"] == {"recommendation": "PROCEED", "fit_score": 71}
     assert manifest["models"] == {"gap_analyzer": "m1"}
     assert manifest["log_lines"] == 3
@@ -80,6 +80,26 @@ def test_write_run_artifacts_two_runs_do_not_clobber(tmp_path):
 
     assert (tmp_path / "r1" / artifacts.RESUME_FILE).read_text() == "first"
     assert (tmp_path / "r2" / artifacts.RESUME_FILE).read_text() == "second"
+
+
+def test_manifest_audit_passed_is_null_when_no_audit_ran():
+    # A run that fails before the audit stage has no audit_report; the manifest must
+    # NOT claim the audit passed (audit_failed defaults False, which would be a lie).
+    result = _result(
+        status=RunStatus.FAILED,
+        audit_report=None,
+        audit_failed=False,
+        final_documents=None,
+    )
+    manifest = build_manifest("rid", result)
+    assert manifest["audit"]["final_status"] is None
+    assert manifest["audit"]["passed"] is None
+
+
+def test_manifest_audit_passed_false_on_rejection():
+    result = _result(audit_report={"final_status": "REJECTED"}, audit_failed=True)
+    manifest = build_manifest("rid", result)
+    assert manifest["audit"]["passed"] is False
 
 
 def test_manifest_warnings_strip_raw_output_pii():
