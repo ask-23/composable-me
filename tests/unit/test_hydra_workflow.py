@@ -167,6 +167,9 @@ class TestHydraWorkflow:
         assert result.final_documents is not None
         assert result.audit_report is not None
         assert result.audit_report["final_status"] == "APPROVED"
+        # retry_count is part of the SSE/frontend AuditReport contract and must be
+        # present even though the honest audit does not re-run on rejection.
+        assert result.audit_report["retry_count"] == 0
         assert result.audit_failed is False
 
     def test_auto_approve_completes_without_pausing(self, mock_llm, mock_agent_results):
@@ -219,6 +222,7 @@ class TestHydraWorkflow:
         assert result.status == RunStatus.COMPLETED_WITH_AUDIT_CONCERNS
         assert result.audit_failed is True
         assert result.audit_report["final_status"] == "REJECTED"
+        assert result.audit_report["retry_count"] == 0  # SSE/frontend contract
         assert result.final_documents is not None
         # Honest gate: each document is audited exactly once (résumé + cover letter),
         # with no pointless re-audit of unchanged text.
@@ -243,6 +247,7 @@ class TestHydraWorkflow:
         assert result.audit_failed is True
         assert "Audit crashed" in result.audit_error
         assert result.audit_report["final_status"] == "AUDIT_ERROR"
+        assert result.audit_report["retry_count"] == 0  # SSE/frontend contract
         assert result.final_documents is not None
         assert result.intermediate_results is not None
 
