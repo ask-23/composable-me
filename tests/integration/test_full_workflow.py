@@ -19,7 +19,11 @@ from runtime.crewai.hydra_workflow import HydraWorkflow
 from runtime.crewai.llm_client import get_llm_client
 
 requires_api_key = pytest.mark.skipif(
-    not (os.environ.get("OPENROUTER_API_KEY") or os.environ.get("TOGETHER_API_KEY") or os.environ.get("CHUTES_API_KEY")),
+    not (
+        os.environ.get("OPENROUTER_API_KEY")
+        or os.environ.get("TOGETHER_API_KEY")
+        or os.environ.get("CHUTES_API_KEY")
+    ),
     reason="API key not set (OPENROUTER_API_KEY, TOGETHER_API_KEY, or CHUTES_API_KEY required)",
 )
 
@@ -76,7 +80,10 @@ def test_full_workflow_reports_retry_information():
     result = workflow.execute(context)
 
     if result.success:
-        retry_count = result.audit_report.get("retry_count", 0)
+        # retry_count must always be present: the SSE complete-event payload sends
+        # this dict raw, and the frontend AuditReport contract requires the field.
+        assert "retry_count" in result.audit_report
+        retry_count = result.audit_report["retry_count"]
         assert 0 <= retry_count <= workflow.max_audit_retries
     else:
         # If the live LLM returns an unfixable output, ensure we see a clear error
