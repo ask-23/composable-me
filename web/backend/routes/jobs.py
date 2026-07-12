@@ -1,28 +1,26 @@
 """Job management endpoints with SSE streaming."""
 
 import json
-from datetime import datetime
 from typing import AsyncGenerator
 
 from litestar import Controller, get, post
-from litestar.response import Response, Stream
-from litestar.status_codes import HTTP_200_OK, HTTP_202_ACCEPTED, HTTP_404_NOT_FOUND
 from litestar.exceptions import HTTPException
+from litestar.response import Stream
+from litestar.status_codes import HTTP_200_OK, HTTP_202_ACCEPTED, HTTP_404_NOT_FOUND
 
 from web.backend.models import (
+    ApproveGapAnalysisRequest,
+    AuditReport,
+    AuditStatus,
     CreateJobRequest,
     CreateJobResponse,
-    JobResponse,
     FinalDocuments,
-    AuditReport,
+    JobResponse,
     JobState,
-    AuditStatus,
-    ApproveGapAnalysisRequest,
     SubmitInterviewAnswersRequest,
 )
 from web.backend.services.job_queue import job_queue
 from web.backend.services.workflow_runner import start_workflow_background
-
 
 _STATE_ORDER: dict[JobState, int] = {
     JobState.INITIALIZED: 0,

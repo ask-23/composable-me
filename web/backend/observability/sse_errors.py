@@ -4,10 +4,9 @@ Provides a single factory for building error payloads emitted over SSE.
 All payloads are PII-redacted before emission.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 from web.backend.observability.pii import redact_pii
-
 
 # Canonical error types for SSE payloads
 ERROR_TYPES = frozenset({

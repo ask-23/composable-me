@@ -7,17 +7,15 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
-
-from web.backend.models import JobState
-from web.backend.services.hydra_db import hydra_db
-from web.backend.services.job_queue import Job, job_queue
-from web.backend.observability.sse_errors import build_error_payload_from_exception
-from web.backend.observability.sentry import capture_error, set_job_context
 
 # Import from parent project
 from runtime.crewai.hydra_workflow import HydraWorkflow, WorkflowState
 from runtime.crewai.llm_client import get_llm_client
+from web.backend.models import JobState
+from web.backend.observability.sentry import capture_error
+from web.backend.observability.sse_errors import build_error_payload_from_exception
+from web.backend.services.hydra_db import hydra_db
+from web.backend.services.job_queue import Job, job_queue
 
 logger = logging.getLogger(__name__)
 

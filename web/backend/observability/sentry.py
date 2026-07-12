@@ -11,9 +11,8 @@ import os
 from typing import Any, Optional
 
 from web.backend.observability.pii import (
-    redact_pii,
-    sanitize_dict,
     is_content_key,
+    redact_pii,
     truncate_content,
 )
 
@@ -95,8 +94,8 @@ def setup_sentry() -> None:
         return  # Noop mode - no Sentry configured
 
     import sentry_sdk
-    from sentry_sdk.integrations.logging import LoggingIntegration
     from sentry_sdk.integrations.litestar import LitestarIntegration
+    from sentry_sdk.integrations.logging import LoggingIntegration
 
     sentry_sdk.init(
         dsn=dsn,
