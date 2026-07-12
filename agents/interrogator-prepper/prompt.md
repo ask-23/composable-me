@@ -155,40 +155,22 @@ For each answer, probe deeper:
 
 Produce structured notes per theme:
 
-```yaml
-interview_notes:
-  - theme: "Agentic AI Integration"
-    context: |
-      Introduced Claude-based PR review agent at [Current Company].
-      Part of broader initiative to reduce review bottlenecks.
-    
-    actions: |
-      - Built MCP server connecting Claude to GitHub
-      - Implemented safety rails: human approval required for merges
-      - Created feedback loop for model improvement
-    
-    tools:
-      - "Claude API"
-      - "MCP (Model Context Protocol)"
-      - "GitHub Actions"
-      - "Custom Go service for orchestration"
-    
-    challenges: |
-      - Hallucination on edge cases
-      - Developer trust issues initially
-      - Cost management for API calls
-    
-    outcomes: |
-      - PR review time: 2 days → 4 hours
-      - Developer adoption: 80% within 3 months
-      - False positive rate: <5%
-    
-    quotable: |
-      "Built an AI code review system that cut PR turnaround 
-       from 2 days to 4 hours while maintaining <5% false positive rate."
-    
-    confidence: high
-    source: "user interview"
+```json
+{
+  "interview_notes": [
+    {
+      "theme": "Agentic AI Integration",
+      "context": "Introduced a Claude-based PR review agent at [Current Company] as part of an initiative to reduce review bottlenecks.",
+      "actions": ["Built an MCP server connecting Claude to GitHub", "Implemented safety rails requiring human approval for merges", "Created a feedback loop for model improvement"],
+      "tools": ["Claude API", "MCP (Model Context Protocol)", "GitHub Actions", "Custom Go service for orchestration"],
+      "challenges": ["Hallucination on edge cases", "Developer trust issues initially", "Cost management for API calls"],
+      "outcomes": ["PR review time: 2 days to 4 hours", "Developer adoption: 80% within 3 months", "False positive rate: under 5%"],
+      "quotable": "Built an AI code review system that cut PR turnaround from 2 days to 4 hours while maintaining under 5% false positive rate.",
+      "confidence": "high",
+      "source": "user interview"
+    }
+  ]
+}
 ```
 
 ## Question Limits

@@ -125,76 +125,18 @@ cultural_alignment:
 
 ## Output Format
 
-```yaml
-differentiation_report:
-  meta:
-    role: "Senior Platform Engineer"
-    company: "TechCorp"
-    generated: "2025-12-02"
-  
-  primary_differentiator:
-    hook: "Builds systems that eliminate bottlenecks, including himself"
-    evidence:
-      - "CI/CD transformation: teams ship without DevOps approval"
-      - "Self-service infrastructure: 80% reduction in ops tickets"
-    why_compelling: |
-      "Most DevOps become gatekeepers. This candidate systematically 
-       removes friction and makes teams autonomous."
-    jd_resonance: |
-      "JD emphasizes 'developer velocity' and 'autonomous teams'—
-       this is exactly what they're describing."
-  
-  secondary_differentiators:
-    - angle: "Enterprise compliance + startup speed"
-      evidence: "SOC2 at multiple companies without slowing shipping"
-      when_to_use: "If compliance mentioned or implied"
-    
-    - angle: "AWS depth rarely seen outside FAANG"
-      evidence: "Multi-account governance, landing zones, org-level"
-      when_to_use: "If AWS emphasis in JD"
-    
-    - angle: "Communicates like a founder, builds like an engineer"
-      evidence: "Business owner, stakeholder presentations"
-      when_to_use: "If leadership component to role"
-  
-  narrative_thread:
-    theme: "The Bottleneck Eliminator"
-    story: |
-      "Career arc is consistent: arrive, find what's slowing people down,
-       build systems that remove the friction, then move on to harder problems."
-    use_in:
-      - "Cover letter opening"
-      - "LinkedIn summary"
-      - "Interview 'tell me about yourself'"
-  
-  contrarian_positions:
-    - position: "ECS over Kubernetes"
-      framing: "Chose simplicity over hype; right-sized for context"
-      when_to_deploy: "If K8s comes up as a gap"
-    
-    - position: "IaC pragmatism over purity"
-      framing: "Ships working infrastructure, not perfect abstractions"
-      when_to_deploy: "If they seem dogmatic about tooling"
-  
-  avoid:
-    - claim: "Full-stack developer"
-      why: "Not accurate; infrastructure focus"
-    
-    - claim: "DevOps transformation leader"
-      why: "Too generic; everyone says this"
-  
-  application_guidance:
-    resume_emphasis:
-      - "Lead with outcomes, not responsibilities"
-      - "Quantify the before/after on bottleneck removal"
-    
-    cover_letter_angle:
-      - "Open with the 'builds himself out of the job' angle"
-      - "Connect to specific JD language about velocity"
-    
-    interview_prep:
-      - "Have the CI/CD transformation story polished"
-      - "Be ready to explain ECS choice without being defensive"
+```json
+{
+  "differentiation_report": {
+    "meta": {"role": "Senior Platform Engineer", "company": "TechCorp", "generated": "2025-12-02"},
+    "primary_differentiator": {"hook": "Builds systems that eliminate bottlenecks, including himself", "evidence": ["CI/CD transformation: teams ship without DevOps approval", "Self-service infrastructure: 80% reduction in ops tickets"], "why_compelling": "Most DevOps become gatekeepers. This candidate systematically removes friction and makes teams autonomous.", "jd_resonance": "JD emphasizes developer velocity and autonomous teams—this is exactly what they are describing."},
+    "secondary_differentiators": [{"angle": "Enterprise compliance + startup speed", "evidence": "SOC2 at multiple companies without slowing shipping", "when_to_use": "If compliance mentioned or implied"}, {"angle": "AWS depth rarely seen outside FAANG", "evidence": "Multi-account governance, landing zones, org-level", "when_to_use": "If AWS emphasis in JD"}, {"angle": "Communicates like a founder, builds like an engineer", "evidence": "Business owner, stakeholder presentations", "when_to_use": "If leadership component to role"}],
+    "narrative_thread": {"theme": "The Bottleneck Eliminator", "story": "Career arc is consistent: arrive, find what is slowing people down, build systems that remove the friction, then move on to harder problems.", "use_in": ["Cover letter opening", "LinkedIn summary", "Interview tell me about yourself"]},
+    "contrarian_positions": [{"position": "ECS over Kubernetes", "framing": "Chose simplicity over hype; right-sized for context", "when_to_deploy": "If K8s comes up as a gap"}, {"position": "IaC pragmatism over purity", "framing": "Ships working infrastructure, not perfect abstractions", "when_to_deploy": "If they seem dogmatic about tooling"}],
+    "avoid": [{"claim": "Full-stack developer", "why": "Not accurate; infrastructure focus"}, {"claim": "DevOps transformation leader", "why": "Too generic; everyone says this"}],
+    "application_guidance": {"resume_emphasis": ["Lead with outcomes, not responsibilities", "Quantify the before/after on bottleneck removal"], "cover_letter_angle": ["Open with the builds himself out of the job angle", "Connect to specific JD language about velocity"], "interview_prep": ["Have the CI/CD transformation story polished", "Be ready to explain ECS choice without being defensive"]}
+  }
+}
 ```
 
 ## Differentiation Quality Checks

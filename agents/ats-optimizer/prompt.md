@@ -216,70 +216,27 @@ optimizations:
 
 ## Output Format
 
-```yaml
-ats_report:
-  meta:
-    role: "Senior Platform Engineer"
-    company: "TechCorp"
-    analyzed: "2025-12-02"
-  
-  summary:
-    keyword_coverage: "85%"
-    format_score: "90%"
-    ats_ready: true
-    human_readable: true
-  
-  keyword_analysis:
-    hard_requirements:
-      - keyword: "AWS"
-        status: "present"
-        count: 8
-      
-      - keyword: "Terraform"
-        status: "present"
-        count: 5
-      
-      - keyword: "Python"
-        status: "missing_but_claimable"
-        action: "Add to skills"
-    
-    soft_requirements:
-      - keyword: "Kubernetes"
-        status: "missing_no_claim"
-        note: "Gap handled by framing as ECS/container adjacent"
-    
-    added_truthfully:
-      - "IaC"
-      - "Linux"
-    
-    not_added:
-      - keyword: "Kubernetes"
-        reason: "No direct experience"
-      
-      - keyword: "GCP"
-        reason: "No experience"
-  
-  format_analysis:
-    issues_found: 2
-    issues_fixed: 2
-    remaining_issues: 0
-  
-  optimized_resume: |
-    [Full optimized resume text]
-  
-  changes_made:
-    - "Added 'CI/CD' to deployment bullet"
-    - "Added 'IaC' near Terraform mention"
-    - "Added 'Linux' to skills"
-    - "Converted skills table to list"
-    - "Standardized bullet characters"
-  
-  verification:
-    all_additions_truthful: true
-    human_readable: true
-    source_mapping:
-      - addition: "Linux"
-        justification: "AWS/Docker experience implies Linux; user confirmed"
+```json
+{
+  "ats_report": {
+    "meta": {"role": "Senior Platform Engineer", "company": "TechCorp", "analyzed": "2025-12-02"},
+    "summary": {"keyword_coverage": "85%", "format_score": "90%", "ats_ready": true, "human_readable": true},
+    "keyword_analysis": {
+      "hard_requirements": [
+        {"keyword": "AWS", "status": "present", "count": 8},
+        {"keyword": "Terraform", "status": "present", "count": 5},
+        {"keyword": "Python", "status": "missing_but_claimable", "action": "Add to skills"}
+      ],
+      "soft_requirements": [{"keyword": "Kubernetes", "status": "missing_no_claim", "note": "Gap handled by framing as ECS/container adjacent"}],
+      "added_truthfully": ["IaC", "Linux"],
+      "not_added": [{"keyword": "Kubernetes", "reason": "No direct experience"}, {"keyword": "GCP", "reason": "No experience"}]
+    },
+    "format_analysis": {"issues_found": 2, "issues_fixed": 2, "remaining_issues": 0},
+    "optimized_resume": "[Full optimized resume text]",
+    "changes_made": ["Added CI/CD to deployment bullet", "Added IaC near Terraform mention", "Added Linux to skills", "Converted skills table to list", "Standardized bullet characters"],
+    "verification": {"all_additions_truthful": true, "human_readable": true, "source_mapping": [{"addition": "Linux", "justification": "AWS/Docker experience implies Linux; user confirmed"}]}
+  }
+}
 ```
 
 ## Keyword Placement Strategy
