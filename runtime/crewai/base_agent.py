@@ -9,6 +9,7 @@ Provides common functionality for all agents including:
 """
 
 import json
+import os
 import re
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -24,6 +25,12 @@ DEFAULT_CONFIDENCE = 0.8
 MIN_CONFIDENCE = 0.0
 MAX_CONFIDENCE = 1.0
 DEFAULT_MAX_RETRIES = 1
+
+# Opt-in flag (default OFF) that routes agent calls straight through LiteLLM instead
+# of spinning up a one-task CrewAI Crew per call. See docs/adr/0001-crewai-vs-direct-llm.md.
+# Kept off by default: the two paths' prompt assembly is not yet proven equivalent
+# against a live model, so this is a scaffold for that migration, not a cutover.
+DIRECT_LLM_ENV = "HYDRA_DIRECT_LLM"
 
 DEFAULT_TRUTH_RULES = """\
 1. Do not fabricate experience, tools, metrics, or outcomes.
@@ -286,6 +293,41 @@ Return ONLY valid JSON. Do not include any text before or after the JSON object.
         # Clamp to valid range
         return max(MIN_CONFIDENCE, min(MAX_CONFIDENCE, float(confidence)))
 
+    def _build_messages(self, task: Task) -> List[Dict[str, str]]:
+        """Assemble system+user messages for a direct LiteLLM call.
+
+        Built from the same pieces the CrewAI path uses: the agent backstory
+        (role + goal + prompt + injected truth/style rules) as the system message,
+        and the task description (which already carries the JSON-output instruction)
+        plus the expected-output contract as the user message.
+        """
+        system = f"You are {self.role}. {self.goal}\n\n{self._build_backstory()}".strip()
+        user = task.description
+        if self.expected_output:
+            user = f"{user}\n\nExpected output: {self.expected_output}"
+        return [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ]
+
+    def _execute_direct(self, task: Task) -> str:
+        """Run one agent call directly through LiteLLM, bypassing CrewAI.
+
+        Opt-in via HYDRA_DIRECT_LLM. Reuses the model/credentials from the CrewAI
+        LLM object so provider routing is unchanged.
+        """
+        import litellm
+
+        llm = self.llm
+        response = litellm.completion(
+            model=getattr(llm, "model", None),
+            messages=self._build_messages(task),
+            temperature=getattr(llm, "temperature", None),
+            api_key=getattr(llm, "api_key", None),
+            base_url=getattr(llm, "base_url", None),
+        )
+        return response["choices"][0]["message"]["content"]
+
     def execute_with_retry(
         self, task: Task, max_retries: int = DEFAULT_MAX_RETRIES
     ) -> Dict[str, Any]:
@@ -309,14 +351,19 @@ Return ONLY valid JSON. Do not include any text before or after the JSON object.
                 try:
                     span.set_attribute("agent.attempt", attempt + 1)
 
-                    # Execute task via a minimal Crew (Task.execute is not available in newer CrewAI)
-                    crew = Crew(
-                        agents=[task.agent],
-                        tasks=[task],
-                        process=Process.sequential,
-                        verbose=False,
-                    )
-                    result = crew.kickoff()
+                    # Default: execute via a minimal one-task Crew. Opt-in: call
+                    # LiteLLM directly (no Crew) when HYDRA_DIRECT_LLM is set.
+                    if os.environ.get(DIRECT_LLM_ENV):
+                        result = self._execute_direct(task)
+                    else:
+                        # Task.execute is not available in newer CrewAI, so wrap in a Crew.
+                        crew = Crew(
+                            agents=[task.agent],
+                            tasks=[task],
+                            process=Process.sequential,
+                            verbose=False,
+                        )
+                        result = crew.kickoff()
 
                     # Validate output
                     validated = self.validate_output(str(result))
