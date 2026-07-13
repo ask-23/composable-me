@@ -168,71 +168,19 @@ compliance_audit:
 
 ## Audit Output Format
 
-```yaml
-audit_report:
-  meta:
-    document_type: "resume"
-    target_role: "Senior Platform Engineer"
-    audited: "2025-12-02T10:30:00Z"
-
-  summary:
-    overall_status: "PASS" | "FAIL" | "CONDITIONAL"
-    blocking_issues: 0
-    warnings: 2
-    recommendations: 3
-
-  truth_audit:
-    status: "PASS"
-    verified_claims: 15
-    approximate_claims: 2
-    issues: []
-
-  tone_audit:
-    status: "CONDITIONAL"
-    score: "borderline"
-    issues:
-      - id: "TONE-001"
-        location: "Summary, line 2"
-        pattern: "leverage my expertise"
-        severity: "warning"
-        fix: "Replace with specific skill mention"
-
-      - id: "TONE-002"
-        location: "Experience bullet 3"
-        pattern: "Perfect parallelism"
-        severity: "warning"
-        fix: "Vary sentence structure"
-
-  ats_audit:
-    status: "PASS"
-    keyword_coverage: "85%"
-    format_issues: []
-    recommendations:
-      - "Consider adding 'IaC' as explicit keyword"
-
-  compliance_audit:
-    status: "PASS"
-    violations: []
-    warnings: []
-
-  action_required:
-    blocking:
-      # Must fix before approval
-      []
-
-    recommended:
-      # Should fix, but can proceed
-      - "TONE-001: Replace 'leverage my expertise'"
-      - "TONE-002: Vary sentence structure in Experience section"
-
-    optional:
-      # Nice to have
-      - "Add 'IaC' keyword"
-
-  approval:
-    approved: false
-    reason: "2 tone warnings should be addressed"
-    next_steps: "Fix warnings and re-submit for audit"
+```json
+{
+  "audit_report": {
+    "meta": {"document_type": "resume", "target_role": "Senior Platform Engineer", "audited": "2025-12-02T10:30:00Z"},
+    "summary": {"overall_status": "CONDITIONAL", "blocking_issues": 0, "warnings": 2, "recommendations": 3},
+    "truth_audit": {"status": "PASS", "verified_claims": 15, "approximate_claims": 2, "issues": []},
+    "tone_audit": {"status": "CONDITIONAL", "score": "borderline", "issues": [{"id": "TONE-001", "location": "Summary, line 2", "pattern": "leverage my expertise", "severity": "warning", "fix": "Replace with specific skill mention"}, {"id": "TONE-002", "location": "Experience bullet 3", "pattern": "Perfect parallelism", "severity": "warning", "fix": "Vary sentence structure"}]},
+    "ats_audit": {"status": "PASS", "keyword_coverage": "85%", "format_issues": [], "recommendations": ["Consider adding IaC as explicit keyword"]},
+    "compliance_audit": {"status": "PASS", "violations": [], "warnings": []},
+    "action_required": {"blocking": [], "recommended": ["TONE-001: Replace leverage my expertise", "TONE-002: Vary sentence structure in Experience section"], "optional": ["Add IaC keyword"]},
+    "approval": {"approved": false, "reason": "2 tone warnings should be addressed", "next_steps": "Fix warnings and re-submit for audit"}
+  }
+}
 ```
 
 ## Severity Levels
