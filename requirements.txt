@@ -1,12 +1,18 @@
 # Composable Me Hydra - Python Dependencies
 
 # Core orchestration
-crewai[anthropic]>=0.86.0
-crewai-tools>=0.17.0
+# Floor raised to 1.15.5: versions <1.15.5 are affected by CVE-2026-2275
+# (Code Interpreter RCE), CVE-2026-2285 (arbitrary local file read via the
+# JSON loader), and CVE-2026-2286 (SSRF via RAG tools).
+crewai[anthropic]>=1.15.5
+crewai-tools>=1.15.5
 
 # LLM providers
 openai>=1.0.0  # Transitive/runtime dependency of crewai for API compatibility
-litellm>=1.80.0  # Required for OpenRouter and other non-native providers
+# Floor raised to 1.83.0: v1.82.7/1.82.8 were a compromised PyPI supply-chain
+# release (credential-stealing malware, pulled ~40 min after publish); 1.83.0
+# is the first clean release after that incident.
+litellm>=1.83.0  # Required for OpenRouter and other non-native providers
 
 # Utilities
 pyyaml>=6.0
